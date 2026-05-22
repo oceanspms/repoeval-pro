@@ -1,0 +1,27 @@
+{
+  "overview": "RepoEval Pro is a production-grade GitHub repository evaluation platform for hiring teams. It deterministically scores candidate submissions against assignment criteria, providing recruiter-grade verdicts, role-wise analytics dashboards with visual breakdowns, and exportable candidate briefs.",
+  "features": [
+    "Professional analytics dashboard with KPI summary cards (total evaluations, avg score, pass/caution/fail rates)",
+    "Role-wise bar charts showing average scores by role",
+    "Score trend line chart over time for tracking evaluation patterns",
+    "Pass/Caution/Fail distribution pie chart for at-a-glance hiring health",
+    "7-dimension metric breakdown per role (coverage, stack match, completeness, depth, docs, demo, AI usage)",
+    "Dynamic role filter pills that update all visualizations instantly",
+    "Batch comparison table with color-coded score badges",
+    "Deterministic evaluation engine with recruiter verdict (Hire/No-Hire)",
+    "Persistent evaluation history with owner identification",
+    "File upload support for PDF, DOCX, TXT assignments",
+    "Export candidate briefs and role reports as CSV/HTML"
+  ],
+  "category": "productivity",
+  "tags": [
+    "hiring",
+    "evaluation",
+    "dashboard",
+    "analytics",
+    "github",
+    "recruiter",
+    "reporting"
+  ],
+  "last_updated": "2026-04-24T08:14:58.568Z"
+}

@@ -1,0 +1,170 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-display: "Space Grotesk";
+    --font-body: "Satoshi";
+    --font-mono: "JetBrains Mono";
+    --radius: 0.5rem;
+
+    --background: 0.96 0.01 280;
+    --foreground: 0.12 0.02 250;
+    --card: 1.0 0 0;
+    --card-foreground: 0.12 0.02 250;
+    --popover: 1.0 0 0;
+    --popover-foreground: 0.12 0.02 250;
+
+    --primary: 0.48 0.15 262;
+    --primary-foreground: 0.98 0 0;
+
+    --secondary: 0.92 0.02 280;
+    --secondary-foreground: 0.2 0.01 250;
+    --muted: 0.88 0.01 280;
+    --muted-foreground: 0.45 0.01 280;
+
+    --accent: 0.58 0.18 185;
+    --accent-foreground: 0.98 0 0;
+
+    --destructive: 0.56 0.24 25;
+    --destructive-foreground: 0.98 0 0;
+
+    --border: 0.92 0.01 280;
+    --input: 0.94 0.01 280;
+    --ring: 0.58 0.18 185;
+
+    --chart-1: 0.58 0.18 185;
+    --chart-2: 0.48 0.15 262;
+    --chart-3: 0.65 0.18 150;
+    --chart-4: 0.72 0.12 45;
+    --chart-5: 0.56 0.24 25;
+
+    --sidebar: 0.96 0.01 280;
+    --sidebar-foreground: 0.12 0.02 250;
+    --sidebar-primary: 0.48 0.15 262;
+    --sidebar-primary-foreground: 0.98 0 0;
+    --sidebar-accent: 0.58 0.18 185;
+    --sidebar-accent-foreground: 0.12 0.02 250;
+    --sidebar-border: 0.92 0.01 280;
+    --sidebar-ring: 0.58 0.18 185;
+  }
+
+  .dark {
+    --background: 0.12 0.02 250;
+    --foreground: 0.94 0.01 280;
+    --card: 0.16 0.02 250;
+    --card-foreground: 0.94 0.01 280;
+    --popover: 0.2 0.02 250;
+    --popover-foreground: 0.94 0.01 280;
+
+    --primary: 0.72 0.16 185;
+    --primary-foreground: 0.12 0.02 250;
+
+    --secondary: 0.2 0.02 250;
+    --secondary-foreground: 0.85 0.02 280;
+    --muted: 0.2 0.02 250;
+    --muted-foreground: 0.52 0.01 280;
+
+    --accent: 0.68 0.2 185;
+    --accent-foreground: 0.12 0.02 250;
+
+    --destructive: 0.64 0.24 25;
+    --destructive-foreground: 0.12 0.02 250;
+
+    --border: 0.25 0.02 250;
+    --input: 0.25 0.02 250;
+    --ring: 0.68 0.2 185;
+
+    --chart-1: 0.68 0.2 185;
+    --chart-2: 0.72 0.16 185;
+    --chart-3: 0.75 0.18 150;
+    --chart-4: 0.82 0.14 45;
+    --chart-5: 0.64 0.24 25;
+
+    --sidebar: 0.16 0.02 250;
+    --sidebar-foreground: 0.94 0.01 280;
+    --sidebar-primary: 0.72 0.16 185;
+    --sidebar-primary-foreground: 0.12 0.02 250;
+    --sidebar-accent: 0.68 0.2 185;
+    --sidebar-accent-foreground: 0.94 0.01 280;
+    --sidebar-border: 0.25 0.02 250;
+    --sidebar-ring: 0.68 0.2 185;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+}
+
+@layer utilities {
+  .transition-smooth {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .transition-smooth {
+      transition: none;
+    }
+    * {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  .score-card {
+    @apply bg-card border border-border rounded-md p-3 flex flex-col items-center justify-center min-w-fit;
+  }
+
+  .score-value {
+    @apply font-mono text-2xl font-semibold text-accent;
+  }
+
+  .score-label {
+    @apply text-xs text-muted-foreground uppercase tracking-wider mt-1;
+  }
+
+  .metric-ribbon {
+    @apply flex gap-2 overflow-x-auto py-2 -mx-2 px-2;
+  }
+
+  .input-field {
+    @apply w-full bg-input border border-border rounded-md px-3 py-2 font-body text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-smooth;
+  }
+
+  .btn-primary {
+    @apply bg-accent hover:bg-accent/90 text-accent-foreground px-4 py-2 rounded-md font-body font-medium transition-smooth;
+  }
+
+  .red-flag {
+    @apply text-destructive text-sm;
+  }
+}
+
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/assets/fonts/SpaceGrotesk.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Satoshi";
+  src: url("/assets/fonts/Satoshi.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/assets/fonts/JetBrainsMono.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}

@@ -1,0 +1,115 @@
+type http_request_result = 
+ record {
+   body: blob;
+   headers: vec http_header;
+   status: nat;
+ };
+type http_header = 
+ record {
+   name: text;
+   value: text;
+ };
+type TransformationOutput = 
+ record {
+   body: blob;
+   headers: vec http_header;
+   status: nat;
+ };
+type TransformationInput = 
+ record {
+   context: blob;
+   response: http_request_result;
+ };
+type Timestamp = int;
+type Scores = 
+ record {
+   aiUsage: nat;
+   completeness: nat;
+   coverage: nat;
+   demo: nat;
+   depth: nat;
+   docs: nat;
+   stackMatch: nat;
+ };
+type RoleStats = 
+ record {
+   avg_ai_usage: nat;
+   avg_completeness: nat;
+   avg_coverage: nat;
+   avg_demo: nat;
+   avg_depth: nat;
+   avg_docs: nat;
+   avg_score: nat;
+   avg_stack_match: nat;
+   count: nat;
+   max_score: nat;
+   min_score: nat;
+   role: text;
+ };
+type RecruiterVerdict = 
+ record {
+   emoji: text;
+   technical_debt: text;
+   verdict: text;
+   why: text;
+ };
+type ExtractTextResult = 
+ variant {
+   err: text;
+   ok: record {
+         is_clean: bool;
+         "text": text;
+       };
+ };
+type EvaluationResult = 
+ record {
+   alignment: Alignment;
+   applied_instructions: vec text;
+   cached: bool;
+   final_score: nat;
+   missing_items: vec text;
+   project_type: text;
+   recruiter_verdict: opt RecruiterVerdict;
+   red_flags: vec text;
+   scores: Scores;
+   summary: text;
+   timestamp: Timestamp;
+ };
+type EvaluationRecord = 
+ record {
+   assignment_text: text;
+   id: text;
+   owner: text;
+   repo_url: text;
+   result: EvaluationResult;
+   timestamp: Timestamp;
+ };
+type Alignment = 
+ variant {
+   High;
+   Low;
+   Medium;
+ };
+service : {
+  clearCache: () -> ();
+  deleteEvaluation: (id: text) -> (bool);
+  evaluate: (repo_urls: vec text, assignment_description: text,
+   optional_notes: opt text) -> (vec EvaluationResult);
+  /// Cache: evaluation results keyed by (repo_url | assignment_description)
+  extractFileText: (fileBytes: blob, fileName: text) -> (ExtractTextResult);
+  /// Persistent history store — survives canister upgrades via enhanced orthogonal persistence
+  extractNotesFileText: (fileBytes: blob, fileName: text) ->
+   (ExtractTextResult);
+  fetchGoogleDocText: (url: text) -> (ExtractTextResult);
+  getCacheStats: () -> (record {
+                          entries: nat;
+                          lastHit: bool;
+                        });
+  getEvaluationById: (id: text) -> (opt EvaluationResult) query;
+  getExportHistory: () -> (vec EvaluationRecord) query;
+  getHistory: () -> (vec EvaluationRecord) query;
+  getHistoryByRepo: (repo_url: text) -> (vec EvaluationRecord) query;
+  getRoleStats: () -> (vec RoleStats) query;
+  getVersion: () -> (text) query;
+  transform: (input: TransformationInput) -> (TransformationOutput) query;
+}

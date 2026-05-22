@@ -1,0 +1,70 @@
+// Version: 1.0.0
+type Alignment__119427168 = {#High; #Low; #Medium};
+type CacheKey__101522246 = Text;
+type Data__791452850<K, V> =
+  {var count : Nat__490723111; kvs : [var ?(K, V)]};
+type EvaluationRecord__294500341 =
+  {
+    assignment_text : Text;
+    id : Text;
+    owner : Text;
+    repo_url : Text;
+    result : EvaluationResult__322217775;
+    timestamp : Timestamp__301639476
+  };
+type EvaluationResult__322217775 =
+  {
+    alignment : Alignment__119427168;
+    applied_instructions : [Text];
+    cached : Bool;
+    final_score : Nat;
+    missing_items : [Text];
+    project_type : Text;
+    recruiter_verdict : ?RecruiterVerdict__836279244;
+    red_flags : [Text];
+    scores : Scores__805501232;
+    summary : Text;
+    timestamp : Timestamp__301639476
+  };
+type Internal__8484328<K, V> =
+  {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
+type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
+type Nat__490723111 = Nat__920180692;
+type Nat__920180692 = Nat;
+type Node__46230540<K, V> =
+  {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type ParsedAssignment__449578808 = {required_items : [Text]; role : Text};
+type RecruiterVerdict__836279244 =
+  {emoji : Text; technical_debt : Text; verdict : Text; why : Text};
+type Scores__805501232 =
+  {
+    aiUsage : Nat;
+    completeness : Nat;
+    coverage : Nat;
+    demo : Nat;
+    depth : Nat;
+    docs : Nat;
+    stackMatch : Nat
+  };
+type Timestamp__301639476 = Int;
+actor {
+  stable assignmentCache :
+    {
+      var root :
+        Node__46230540<CacheKey__101522246, ParsedAssignment__449578808>;
+      var size : Nat__490723111
+    };
+  stable evalCache :
+    {
+      var root :
+        Node__46230540<CacheKey__101522246, EvaluationResult__322217775>;
+      var size : Nat__490723111
+    };
+  stable evalCounter : {var value : Nat};
+  stable historyStore :
+    {
+      var root : Node__46230540<Text, EvaluationRecord__294500341>;
+      var size : Nat__490723111
+    };
+  stable lastCacheHit : {var value : Bool}
+};

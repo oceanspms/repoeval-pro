@@ -1,4 +1,11 @@
-import type { Alignment, EvaluationRecord, EvaluationResult, RoleStats, backendInterface } from "../backend";
+import { Variant_fail_pass_caution } from "../backend";
+import type { 
+  Alignment,
+  EvaluationRecord,
+  EvaluationResult,
+  RoleStats,
+  backendInterface,
+ } from "../backend";
 
 const sampleResult: EvaluationResult = {
   scores: {
@@ -7,11 +14,11 @@ const sampleResult: EvaluationResult = {
     completeness: BigInt(9),
     depth: BigInt(7),
     docs: BigInt(8),
-    demo: BigInt(3),
+    demoReadiness: BigInt(3),
     aiUsage: BigInt(6),
   },
   summary:
-    "Strong fullstack submission with excellent coverage (9/10) and solid documentation (8/10). The candidate demonstrates deep knowledge of the required stack with good completeness (9/10). The biggest gap is demo quality (3/10) — no live demo or working prototype was provided. AI usage is moderate (6/10) which is within acceptable bounds. Overall a compelling submission that warrants an interview despite the demo gap.",
+    "Strong fullstack submission with excellent coverage (9/10) and solid documentation (8/10). The candidate demonstrates deep knowledge of the required stack with good completeness (9/10). The biggest gap is demo readiness (3/10) — no live demo or working prototype was provided. AI usage is moderate (6/10) which is within acceptable bounds. Overall a compelling submission that warrants an interview despite the demo gap.",
   missing_items: ["Live demo URL", "docker-compose.yml", "CI/CD pipeline config"],
   final_score: BigInt(9),
   timestamp: BigInt(Date.now()),
@@ -19,12 +26,16 @@ const sampleResult: EvaluationResult = {
   red_flags: ["No live demo found", "Missing docker-compose"],
   project_type: "Fullstack",
   alignment: "High" as unknown as Alignment,
+  strengths: ["Coverage", "Completeness", "Stack Match"],
+  criticalGaps: ["No live demo", "Missing docker-compose"],
   recruiter_verdict: {
-    verdict: "Highly Recommended",
+    verdict: Variant_fail_pass_caution.pass,
     emoji: "✅",
     why:
       "This candidate built a production-grade fullstack app with clean code and thorough documentation. The only notable gap is the absence of a live demo, which is a minor concern given the overall quality.",
     technical_debt: "Production Ready",
+    strengths: ["Coverage", "Completeness", "Stack Match"],
+    criticalGaps: ["No live demo", "Missing docker-compose"],
   },
   applied_instructions: ["Weighted Dockerfile more heavily per recruiter notes"],
 };
@@ -36,7 +47,7 @@ const sampleResult2: EvaluationResult = {
     completeness: BigInt(6),
     depth: BigInt(5),
     docs: BigInt(4),
-    demo: BigInt(7),
+    demoReadiness: BigInt(7),
     aiUsage: BigInt(8),
   },
   summary:
@@ -48,12 +59,16 @@ const sampleResult2: EvaluationResult = {
   red_flags: ["No test files found", "README is empty"],
   project_type: "Frontend",
   alignment: "Medium" as unknown as Alignment,
+  strengths: ["Demo Readiness", "AI Usage", "Coverage"],
+  criticalGaps: ["Missing unit tests", "README is empty"],
   recruiter_verdict: {
-    verdict: "Proceed with Caution",
+    verdict: Variant_fail_pass_caution.caution,
     emoji: "⚠️",
     why:
       "The candidate delivered a working prototype but the codebase lacks tests and proper documentation. Good for a junior role but would need close mentoring.",
     technical_debt: "Prototype Grade",
+    strengths: ["Demo Readiness", "AI Usage"],
+    criticalGaps: ["Missing unit tests", "README is empty"],
   },
   applied_instructions: [],
 };
@@ -65,7 +80,7 @@ const sampleResult3: EvaluationResult = {
     completeness: BigInt(3),
     depth: BigInt(2),
     docs: BigInt(2),
-    demo: BigInt(1),
+    demoReadiness: BigInt(1),
     aiUsage: BigInt(9),
   },
   summary:
@@ -77,12 +92,16 @@ const sampleResult3: EvaluationResult = {
   red_flags: ["Possible AI-generated code", "No tests", "No documentation", "No demo"],
   project_type: "Backend",
   alignment: "Low" as unknown as Alignment,
+  strengths: ["AI Usage detection"],
+  criticalGaps: ["No demo", "No documentation", "Critical features missing"],
   recruiter_verdict: {
-    verdict: "Not Recommended",
+    verdict: Variant_fail_pass_caution.fail,
     emoji: "❌",
     why:
       "Too many gaps across all evaluation areas to justify moving forward. The submission does not meet the minimum bar for this position.",
     technical_debt: "Prototype Grade",
+    strengths: [],
+    criticalGaps: ["No demo", "No documentation", "Critical features missing"],
   },
   applied_instructions: [],
 };

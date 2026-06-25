@@ -1,7 +1,12 @@
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { EvaluationResult, RecruiterVerdict, Scores } from "../types";
+import type {
+  EvaluationResult,
+  RecruiterVerdict,
+  Scores,
+  Variant_fail_pass_caution,
+} from "../types";
 import { AlignmentBadge } from "./AlignmentBadge";
 import { ScoreCard } from "./ScoreCard";
 
@@ -21,38 +26,54 @@ function formatTimestamp(ts: bigint): string {
   });
 }
 
-/** Derive a verdict from final_score when backend doesn't provide one */
+/** Map backend variant verdict to PASS/CAUTION/FAIL display label */
+function verdictLabel(
+  v: Variant_fail_pass_caution | string,
+): "PASS" | "CAUTION" | "FAIL" {
+  const s = String(v).toLowerCase();
+  if (s === "pass") return "PASS";
+  if (s === "caution") return "CAUTION";
+  return "FAIL";
+}
+
+/** Derive a full RecruiterVerdict from final_score when backend doesn't provide one */
 function deriveVerdict(finalScore: number): RecruiterVerdict {
-  if (finalScore > 8.5) {
+  if (finalScore >= 80) {
     return {
       emoji: "✅",
-      verdict: "Highly Recommended",
+      verdict: "pass" as Variant_fail_pass_caution,
       why: "This candidate demonstrates strong alignment with the assignment requirements and solid technical execution across all evaluated dimensions.",
       technical_debt: "Production Ready",
+      strengths: [],
+      criticalGaps: [],
     };
   }
-  if (finalScore >= 6.0) {
+  if (finalScore >= 60) {
     return {
       emoji: "⚠️",
-      verdict: "Proceed with Caution",
+      verdict: "caution" as Variant_fail_pass_caution,
       why: "The submission shows partial alignment with the assignment — key areas are covered but notable gaps remain that should be addressed in the interview.",
       technical_debt: "Prototype Grade",
+      strengths: [],
+      criticalGaps: [],
     };
   }
   return {
     emoji: "❌",
-    verdict: "Not Recommended",
+    verdict: "fail" as Variant_fail_pass_caution,
     why: "The submission does not adequately meet the assignment requirements. Significant work is missing and the overall quality falls below the threshold for this role.",
     technical_debt: "Prototype Grade",
+    strengths: [],
+    criticalGaps: [],
   };
 }
 
-function verdictColors(emoji: string): {
+function verdictColors(label: "PASS" | "CAUTION" | "FAIL"): {
   wrapper: string;
   badge: string;
   debtPill: (debt: string) => string;
 } {
-  if (emoji === "✅") {
+  if (label === "PASS") {
     return {
       wrapper:
         "bg-[oklch(var(--chart-2)/0.08)] border-[oklch(var(--chart-2)/0.3)]",
@@ -63,7 +84,7 @@ function verdictColors(emoji: string): {
           : "bg-muted text-muted-foreground border-border",
     };
   }
-  if (emoji === "⚠️") {
+  if (label === "CAUTION") {
     return {
       wrapper:
         "bg-[oklch(var(--chart-4)/0.08)] border-[oklch(var(--chart-4)/0.3)]",
@@ -89,9 +110,9 @@ function buildRuleBasedSummary(result: EvaluationResult): string[] {
   const s: Scores = result.scores;
 
   const line1 =
-    final >= 8
+    final >= 80
       ? "Strong submission with broad requirement coverage."
-      : final >= 5
+      : final >= 50
         ? "Partial implementation — key areas partially covered."
         : "Misaligned or significantly incomplete submission.";
 
@@ -101,7 +122,7 @@ function buildRuleBasedSummary(result: EvaluationResult): string[] {
     { label: "completeness", score: toNum(s.completeness) },
     { label: "depth", score: toNum(s.depth) },
     { label: "documentation", score: toNum(s.docs) },
-    { label: "demo", score: toNum(s.demo) },
+    { label: "demo", score: toNum(s.demoReadiness) },
     { label: "AI usage", score: toNum(s.aiUsage) },
   ];
 
@@ -109,18 +130,18 @@ function buildRuleBasedSummary(result: EvaluationResult): string[] {
   const strongest = sorted[0];
   const weakest = sorted[sorted.length - 1];
 
-  const line2 = `Strongest area: ${strongest.label} (${strongest.score}/10).`;
+  const line2 = `Strongest area: ${strongest.label} (${strongest.score}/100).`;
 
   const firstMissing = result.missing_items[0];
   const missingPart = firstMissing
     ? ` Missing: ${firstMissing.toLowerCase()}.`
     : "";
-  const line3 = `Weakest area: ${weakest.label} (${weakest.score}/10).${missingPart}`;
+  const line3 = `Weakest area: ${weakest.label} (${weakest.score}/100).${missingPart}`;
 
   const line4 =
     result.red_flags.length > 0
       ? `Top concern: ${result.red_flags[0]}`
-      : final >= 8
+      : final >= 80
         ? "Recommend proceeding to next evaluation stage."
         : "Recommend requesting demo or clarification on weak areas.";
 
@@ -146,15 +167,15 @@ function buildPlainText(result: EvaluationResult): string {
     `Project Type: ${result.project_type}`,
     `Assignment Alignment: ${result.alignment}`,
     "",
-    `Coverage:     ${toNum(s.coverage)}/10`,
-    `Stack Match:  ${toNum(s.stackMatch)}/10`,
-    `Completeness: ${toNum(s.completeness)}/10`,
-    `Depth:        ${toNum(s.depth)}/10`,
-    `Docs:         ${toNum(s.docs)}/10`,
-    `Demo:         ${toNum(s.demo)}/10`,
-    `AI Usage:     ${toNum(s.aiUsage)}/10`,
+    `Coverage:     ${toNum(s.coverage)}/100`,
+    `Stack Match:  ${toNum(s.stackMatch)}/100`,
+    `Completeness: ${toNum(s.completeness)}/100`,
+    `Depth:        ${toNum(s.depth)}/100`,
+    `Docs:         ${toNum(s.docs)}/100`,
+    `Demo:         ${toNum(s.demoReadiness)}/100`,
+    `AI Usage:     ${toNum(s.aiUsage)}/100`,
     "",
-    `Final Score: ${toNum(result.final_score)}/10`,
+    `Final Score: ${toNum(result.final_score)}/100`,
     "",
     "Summary:",
     ...lines_summary,
@@ -177,8 +198,17 @@ export function ResultReport({ result }: ResultReportProps) {
   // Prefer backend verdict; fall back to client-side derivation
   const verdict: RecruiterVerdict =
     result.recruiter_verdict ?? deriveVerdict(finalScore);
-  const colors = verdictColors(verdict.emoji);
+  const label = verdictLabel(verdict.verdict);
+  const colors = verdictColors(label);
   const appliedInstructions = result.applied_instructions ?? [];
+
+  // Strengths and critical gaps — prefer verdict-level, fall back to result-level
+  const strengths: string[] =
+    (verdict.strengths?.length ? verdict.strengths : result.strengths) ?? [];
+  const criticalGaps: string[] =
+    (verdict.criticalGaps?.length
+      ? verdict.criticalGaps
+      : result.criticalGaps) ?? [];
 
   const scoreMetrics = [
     {
@@ -198,7 +228,7 @@ export function ResultReport({ result }: ResultReportProps) {
     },
     { label: "Depth", score: toNum(s.depth), ocid: "result.depth_card" },
     { label: "Docs", score: toNum(s.docs), ocid: "result.docs_card" },
-    { label: "Demo", score: toNum(s.demo), ocid: "result.demo_card" },
+    { label: "Demo", score: toNum(s.demoReadiness), ocid: "result.demo_card" },
     {
       label: "AI Usage",
       score: toNum(s.aiUsage),
@@ -241,7 +271,7 @@ export function ResultReport({ result }: ResultReportProps) {
               colors.badge,
             ].join(" ")}
           >
-            {verdict.verdict}
+            {label}
           </span>
           {/* Alignment badge sits inline */}
           <AlignmentBadge alignment={result.alignment} />
@@ -263,20 +293,63 @@ export function ResultReport({ result }: ResultReportProps) {
           >
             {verdict.technical_debt}
           </span>
-          {/* Prompt log presence indicator — no penalty when absent */}
+          {/* AI Usage dimension score — neutral display, no misleading Present/Absent */}
           <span
             data-ocid="result.prompt_log_badge"
-            className={
-              toNum(s.aiUsage) > 0
-                ? "text-xs font-medium px-2.5 py-1 rounded-full border bg-[oklch(var(--chart-2)/0.1)] text-[oklch(var(--chart-2))] border-[oklch(var(--chart-2)/0.3)]"
-                : "text-xs font-medium px-2.5 py-1 rounded-full border bg-muted/50 text-muted-foreground border-border"
-            }
+            className="text-xs font-medium px-2.5 py-1 rounded-full border bg-muted/50 text-muted-foreground border-border"
           >
-            {toNum(s.aiUsage) > 0
-              ? "Prompt log: Present — evaluated as bonus"
-              : "Prompt log: Not provided — no penalty"}
+            {appliedInstructions.some((instr) => /prompt.?log/i.test(instr))
+              ? `AI Usage: ${toNum(s.aiUsage)}/100 · Prompt log evaluated`
+              : `AI Usage: ${toNum(s.aiUsage)}/100`}
           </span>
         </div>
+
+        {/* Strengths & Critical Gaps from backend */}
+        {(strengths.length > 0 || criticalGaps.length > 0) && (
+          <div
+            data-ocid="result.strengths_gaps"
+            className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-current/10"
+          >
+            {strengths.length > 0 && (
+              <div>
+                <span className="text-[10px] uppercase tracking-widest font-mono text-[oklch(var(--chart-3))] font-semibold block mb-1.5">
+                  Strengths
+                </span>
+                <ul className="flex flex-col gap-1">
+                  {strengths.map((str, i) => (
+                    <li
+                      key={`strength-${str.slice(0, 24)}-${i}`}
+                      data-ocid={`result.strength.item.${i + 1}`}
+                      className="text-xs text-[oklch(var(--chart-3))] flex items-start gap-1.5"
+                    >
+                      <span className="mt-1 w-1.5 h-1.5 rounded-full bg-[oklch(var(--chart-3))] flex-shrink-0" />
+                      {str}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {criticalGaps.length > 0 && (
+              <div>
+                <span className="text-[10px] uppercase tracking-widest font-mono text-destructive font-semibold block mb-1.5">
+                  Critical Gaps
+                </span>
+                <ul className="flex flex-col gap-1">
+                  {criticalGaps.map((gap, i) => (
+                    <li
+                      key={`gap-${gap.slice(0, 24)}-${i}`}
+                      data-ocid={`result.critical_gap.item.${i + 1}`}
+                      className="text-xs text-destructive flex items-start gap-1.5"
+                    >
+                      <span className="mt-0.5 flex-shrink-0">⚠</span>
+                      {gap}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Instructions applied (if any) */}
         {appliedInstructions.length > 0 && (
@@ -424,16 +497,16 @@ export function ResultReport({ result }: ResultReportProps) {
             data-ocid="result.final_score_value"
             className={[
               "font-mono font-bold text-4xl leading-none",
-              finalScore >= 7
+              finalScore >= 70
                 ? "text-[oklch(var(--chart-3))]"
-                : finalScore >= 4
+                : finalScore >= 40
                   ? "text-[oklch(var(--chart-4))]"
                   : "text-destructive",
             ].join(" ")}
           >
             {finalScore}
           </span>
-          <span className="font-mono text-muted-foreground text-lg">/10</span>
+          <span className="font-mono text-muted-foreground text-lg">/100</span>
         </div>
       </div>
 

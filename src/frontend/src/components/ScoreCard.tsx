@@ -5,22 +5,22 @@ interface ScoreCardProps {
   "data-ocid"?: string;
 }
 
-// pass ≥7 → chart-3 (green), warn 4-6 → chart-4 (amber), fail <4 → destructive (red)
+// pass ≥70 → chart-3 (green), warn 40-69 → chart-4 (amber), fail <40 → destructive (red)
 function scoreColor(score: number): string {
-  if (score >= 7) return "text-[oklch(var(--chart-3))]";
-  if (score >= 4) return "text-[oklch(var(--chart-4))]";
+  if (score >= 70) return "text-[oklch(var(--chart-3))]";
+  if (score >= 40) return "text-[oklch(var(--chart-4))]";
   return "text-destructive";
 }
 
 function scoreBorder(score: number): string {
-  if (score >= 7) return "border-[oklch(var(--chart-3)/0.3)]";
-  if (score >= 4) return "border-[oklch(var(--chart-4)/0.3)]";
+  if (score >= 70) return "border-[oklch(var(--chart-3)/0.3)]";
+  if (score >= 40) return "border-[oklch(var(--chart-4)/0.3)]";
   return "border-destructive/30";
 }
 
 function scoreBg(score: number): string {
-  if (score >= 7) return "bg-[oklch(var(--chart-3)/0.05)]";
-  if (score >= 4) return "bg-[oklch(var(--chart-4)/0.05)]";
+  if (score >= 70) return "bg-[oklch(var(--chart-3)/0.05)]";
+  if (score >= 40) return "bg-[oklch(var(--chart-4)/0.05)]";
   return "bg-destructive/5";
 }
 
@@ -52,7 +52,7 @@ export function ScoreCard({
           .join(" ")}
       >
         {score}
-        <span className="text-muted-foreground font-normal text-sm">/10</span>
+        <span className="text-muted-foreground font-normal text-sm">/100</span>
       </span>
       <span className="text-[10px] uppercase tracking-wider text-muted-foreground mt-1.5 text-center leading-tight">
         {label}

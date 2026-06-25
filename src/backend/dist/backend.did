@@ -26,7 +26,7 @@ type Scores =
    aiUsage: nat;
    completeness: nat;
    coverage: nat;
-   demo: nat;
+   demoReadiness: nat;
    depth: nat;
    docs: nat;
    stackMatch: nat;
@@ -48,9 +48,15 @@ type RoleStats =
  };
 type RecruiterVerdict = 
  record {
+   criticalGaps: vec text;
    emoji: text;
+   strengths: vec text;
    technical_debt: text;
-   verdict: text;
+   verdict: variant {
+              caution;
+              fail;
+              pass;
+            };
    why: text;
  };
 type ExtractTextResult = 
@@ -66,12 +72,14 @@ type EvaluationResult =
    alignment: Alignment;
    applied_instructions: vec text;
    cached: bool;
+   criticalGaps: vec text;
    final_score: nat;
    missing_items: vec text;
    project_type: text;
    recruiter_verdict: opt RecruiterVerdict;
    red_flags: vec text;
    scores: Scores;
+   strengths: vec text;
    summary: text;
    timestamp: Timestamp;
  };
@@ -95,9 +103,7 @@ service : {
   deleteEvaluation: (id: text) -> (bool);
   evaluate: (repo_urls: vec text, assignment_description: text,
    optional_notes: opt text) -> (vec EvaluationResult);
-  /// Cache: evaluation results keyed by (repo_url | assignment_description)
   extractFileText: (fileBytes: blob, fileName: text) -> (ExtractTextResult);
-  /// Persistent history store — survives canister upgrades via enhanced orthogonal persistence
   extractNotesFileText: (fileBytes: blob, fileName: text) ->
    (ExtractTextResult);
   fetchGoogleDocText: (url: text) -> (ExtractTextResult);

@@ -91,6 +91,7 @@ export class ExternalBlob {
 }
 export interface EvaluationResult {
     applied_instructions: Array<string>;
+    strengths: Array<string>;
     scores: Scores;
     summary: string;
     missing_items: Array<string>;
@@ -101,6 +102,7 @@ export interface EvaluationResult {
     project_type: string;
     alignment: Alignment;
     recruiter_verdict?: RecruiterVerdict;
+    criticalGaps: Array<string>;
 }
 export type ExtractTextResult = {
     __kind__: "ok";
@@ -124,13 +126,15 @@ export interface TransformationInput {
 }
 export interface RecruiterVerdict {
     why: string;
+    strengths: Array<string>;
     emoji: string;
-    verdict: string;
+    verdict: Variant_fail_pass_caution;
     technical_debt: string;
+    criticalGaps: Array<string>;
 }
 export interface Scores {
+    demoReadiness: bigint;
     stackMatch: bigint;
-    demo: bigint;
     docs: bigint;
     coverage: bigint;
     completeness: bigint;
@@ -173,17 +177,16 @@ export enum Alignment {
     High = "High",
     Medium = "Medium"
 }
+export enum Variant_fail_pass_caution {
+    fail = "fail",
+    pass = "pass",
+    caution = "caution"
+}
 export interface backendInterface {
     clearCache(): Promise<void>;
     deleteEvaluation(id: string): Promise<boolean>;
     evaluate(repo_urls: Array<string>, assignment_description: string, optional_notes: string | null): Promise<Array<EvaluationResult>>;
-    /**
-     * / Cache: evaluation results keyed by (repo_url | assignment_description)
-     */
     extractFileText(fileBytes: Uint8Array, fileName: string): Promise<ExtractTextResult>;
-    /**
-     * / Persistent history store — survives canister upgrades via enhanced orthogonal persistence
-     */
     extractNotesFileText(fileBytes: Uint8Array, fileName: string): Promise<ExtractTextResult>;
     fetchGoogleDocText(url: string): Promise<ExtractTextResult>;
     getCacheStats(): Promise<{
@@ -247,42 +250,42 @@ export class Backend implements backendInterface {
         if (this.processError) {
             try {
                 const result = await this.actor.extractFileText(arg0, arg1);
-                return from_candid_ExtractTextResult_n8(this._uploadFile, this._downloadFile, result);
+                return from_candid_ExtractTextResult_n11(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.extractFileText(arg0, arg1);
-            return from_candid_ExtractTextResult_n8(this._uploadFile, this._downloadFile, result);
+            return from_candid_ExtractTextResult_n11(this._uploadFile, this._downloadFile, result);
         }
     }
     async extractNotesFileText(arg0: Uint8Array, arg1: string): Promise<ExtractTextResult> {
         if (this.processError) {
             try {
                 const result = await this.actor.extractNotesFileText(arg0, arg1);
-                return from_candid_ExtractTextResult_n8(this._uploadFile, this._downloadFile, result);
+                return from_candid_ExtractTextResult_n11(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.extractNotesFileText(arg0, arg1);
-            return from_candid_ExtractTextResult_n8(this._uploadFile, this._downloadFile, result);
+            return from_candid_ExtractTextResult_n11(this._uploadFile, this._downloadFile, result);
         }
     }
     async fetchGoogleDocText(arg0: string): Promise<ExtractTextResult> {
         if (this.processError) {
             try {
                 const result = await this.actor.fetchGoogleDocText(arg0);
-                return from_candid_ExtractTextResult_n8(this._uploadFile, this._downloadFile, result);
+                return from_candid_ExtractTextResult_n11(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.fetchGoogleDocText(arg0);
-            return from_candid_ExtractTextResult_n8(this._uploadFile, this._downloadFile, result);
+            return from_candid_ExtractTextResult_n11(this._uploadFile, this._downloadFile, result);
         }
     }
     async getCacheStats(): Promise<{
@@ -306,56 +309,56 @@ export class Backend implements backendInterface {
         if (this.processError) {
             try {
                 const result = await this.actor.getEvaluationById(arg0);
-                return from_candid_opt_n10(this._uploadFile, this._downloadFile, result);
+                return from_candid_opt_n13(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getEvaluationById(arg0);
-            return from_candid_opt_n10(this._uploadFile, this._downloadFile, result);
+            return from_candid_opt_n13(this._uploadFile, this._downloadFile, result);
         }
     }
     async getExportHistory(): Promise<Array<EvaluationRecord>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getExportHistory();
-                return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n14(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getExportHistory();
-            return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+            return from_candid_vec_n14(this._uploadFile, this._downloadFile, result);
         }
     }
     async getHistory(): Promise<Array<EvaluationRecord>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getHistory();
-                return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n14(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getHistory();
-            return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+            return from_candid_vec_n14(this._uploadFile, this._downloadFile, result);
         }
     }
     async getHistoryByRepo(arg0: string): Promise<Array<EvaluationRecord>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getHistoryByRepo(arg0);
-                return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+                return from_candid_vec_n14(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getHistoryByRepo(arg0);
-            return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+            return from_candid_vec_n14(this._uploadFile, this._downloadFile, result);
         }
     }
     async getRoleStats(): Promise<Array<RoleStats>> {
@@ -404,22 +407,25 @@ export class Backend implements backendInterface {
 function from_candid_Alignment_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Alignment): Alignment {
     return from_candid_variant_n6(_uploadFile, _downloadFile, value);
 }
-function from_candid_EvaluationRecord_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _EvaluationRecord): EvaluationRecord {
-    return from_candid_record_n13(_uploadFile, _downloadFile, value);
+function from_candid_EvaluationRecord_n15(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _EvaluationRecord): EvaluationRecord {
+    return from_candid_record_n16(_uploadFile, _downloadFile, value);
 }
 function from_candid_EvaluationResult_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _EvaluationResult): EvaluationResult {
     return from_candid_record_n4(_uploadFile, _downloadFile, value);
 }
-function from_candid_ExtractTextResult_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _ExtractTextResult): ExtractTextResult {
-    return from_candid_variant_n9(_uploadFile, _downloadFile, value);
+function from_candid_ExtractTextResult_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _ExtractTextResult): ExtractTextResult {
+    return from_candid_variant_n12(_uploadFile, _downloadFile, value);
 }
-function from_candid_opt_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_EvaluationResult]): EvaluationResult | null {
+function from_candid_RecruiterVerdict_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _RecruiterVerdict): RecruiterVerdict {
+    return from_candid_record_n9(_uploadFile, _downloadFile, value);
+}
+function from_candid_opt_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_EvaluationResult]): EvaluationResult | null {
     return value.length === 0 ? null : from_candid_EvaluationResult_n3(_uploadFile, _downloadFile, value[0]);
 }
 function from_candid_opt_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_RecruiterVerdict]): RecruiterVerdict | null {
-    return value.length === 0 ? null : value[0];
+    return value.length === 0 ? null : from_candid_RecruiterVerdict_n8(_uploadFile, _downloadFile, value[0]);
 }
-function from_candid_record_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_record_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: string;
     result: _EvaluationResult;
     owner: string;
@@ -445,6 +451,7 @@ function from_candid_record_n13(_uploadFile: (file: ExternalBlob) => Promise<Uin
 }
 function from_candid_record_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     applied_instructions: Array<string>;
+    strengths: Array<string>;
     scores: _Scores;
     summary: string;
     missing_items: Array<string>;
@@ -455,8 +462,10 @@ function from_candid_record_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint
     project_type: string;
     alignment: _Alignment;
     recruiter_verdict: [] | [_RecruiterVerdict];
+    criticalGaps: Array<string>;
 }): {
     applied_instructions: Array<string>;
+    strengths: Array<string>;
     scores: Scores;
     summary: string;
     missing_items: Array<string>;
@@ -467,9 +476,11 @@ function from_candid_record_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint
     project_type: string;
     alignment: Alignment;
     recruiter_verdict?: RecruiterVerdict;
+    criticalGaps: Array<string>;
 } {
     return {
         applied_instructions: value.applied_instructions,
+        strengths: value.strengths,
         scores: value.scores,
         summary: value.summary,
         missing_items: value.missing_items,
@@ -479,19 +490,50 @@ function from_candid_record_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint
         red_flags: value.red_flags,
         project_type: value.project_type,
         alignment: from_candid_Alignment_n5(_uploadFile, _downloadFile, value.alignment),
-        recruiter_verdict: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.recruiter_verdict))
+        recruiter_verdict: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.recruiter_verdict)),
+        criticalGaps: value.criticalGaps
     };
 }
-function from_candid_variant_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    Low: null;
-} | {
-    High: null;
-} | {
-    Medium: null;
-}): Alignment {
-    return "Low" in value ? Alignment.Low : "High" in value ? Alignment.High : "Medium" in value ? Alignment.Medium : value;
+function from_candid_record_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    why: string;
+    strengths: Array<string>;
+    emoji: string;
+    verdict: {
+        fail: null;
+    } | {
+        pass: null;
+    } | {
+        caution: null;
+    };
+    technical_debt: string;
+    criticalGaps: Array<string>;
+}): {
+    why: string;
+    strengths: Array<string>;
+    emoji: string;
+    verdict: Variant_fail_pass_caution;
+    technical_debt: string;
+    criticalGaps: Array<string>;
+} {
+    return {
+        why: value.why,
+        strengths: value.strengths,
+        emoji: value.emoji,
+        verdict: from_candid_variant_n10(_uploadFile, _downloadFile, value.verdict),
+        technical_debt: value.technical_debt,
+        criticalGaps: value.criticalGaps
+    };
 }
-function from_candid_variant_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    fail: null;
+} | {
+    pass: null;
+} | {
+    caution: null;
+}): Variant_fail_pass_caution {
+    return "fail" in value ? Variant_fail_pass_caution.fail : "pass" in value ? Variant_fail_pass_caution.pass : "caution" in value ? Variant_fail_pass_caution.caution : value;
+}
+function from_candid_variant_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     ok: {
         text: string;
         is_clean: boolean;
@@ -516,8 +558,17 @@ function from_candid_variant_n9(_uploadFile: (file: ExternalBlob) => Promise<Uin
         err: value.err
     } : value;
 }
-function from_candid_vec_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_EvaluationRecord>): Array<EvaluationRecord> {
-    return value.map((x)=>from_candid_EvaluationRecord_n12(_uploadFile, _downloadFile, x));
+function from_candid_variant_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    Low: null;
+} | {
+    High: null;
+} | {
+    Medium: null;
+}): Alignment {
+    return "Low" in value ? Alignment.Low : "High" in value ? Alignment.High : "Medium" in value ? Alignment.Medium : value;
+}
+function from_candid_vec_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_EvaluationRecord>): Array<EvaluationRecord> {
+    return value.map((x)=>from_candid_EvaluationRecord_n15(_uploadFile, _downloadFile, x));
 }
 function from_candid_vec_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_EvaluationResult>): Array<EvaluationResult> {
     return value.map((x)=>from_candid_EvaluationResult_n3(_uploadFile, _downloadFile, x));

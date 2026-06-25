@@ -23,6 +23,7 @@ export interface EvaluationRecord {
 }
 export interface EvaluationResult {
   'applied_instructions' : Array<string>,
+  'strengths' : Array<string>,
   'scores' : Scores,
   'summary' : string,
   'missing_items' : Array<string>,
@@ -33,6 +34,7 @@ export interface EvaluationResult {
   'project_type' : string,
   'alignment' : Alignment,
   'recruiter_verdict' : [] | [RecruiterVerdict],
+  'criticalGaps' : Array<string>,
 }
 export type ExtractTextResult = {
     'ok' : { 'text' : string, 'is_clean' : boolean }
@@ -40,9 +42,13 @@ export type ExtractTextResult = {
   { 'err' : string };
 export interface RecruiterVerdict {
   'why' : string,
+  'strengths' : Array<string>,
   'emoji' : string,
-  'verdict' : string,
+  'verdict' : { 'fail' : null } |
+    { 'pass' : null } |
+    { 'caution' : null },
   'technical_debt' : string,
+  'criticalGaps' : Array<string>,
 }
 export interface RoleStats {
   'avg_stack_match' : bigint,
@@ -59,8 +65,8 @@ export interface RoleStats {
   'avg_docs' : bigint,
 }
 export interface Scores {
+  'demoReadiness' : bigint,
   'stackMatch' : bigint,
-  'demo' : bigint,
   'docs' : bigint,
   'coverage' : bigint,
   'completeness' : bigint,
@@ -90,13 +96,7 @@ export interface _SERVICE {
     [Array<string>, string, [] | [string]],
     Array<EvaluationResult>
   >,
-  /**
-   * / Cache: evaluation results keyed by (repo_url | assignment_description)
-   */
   'extractFileText' : ActorMethod<[Uint8Array, string], ExtractTextResult>,
-  /**
-   * / Persistent history store — survives canister upgrades via enhanced orthogonal persistence
-   */
   'extractNotesFileText' : ActorMethod<[Uint8Array, string], ExtractTextResult>,
   'fetchGoogleDocText' : ActorMethod<[string], ExtractTextResult>,
   'getCacheStats' : ActorMethod<

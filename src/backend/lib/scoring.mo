@@ -92,150 +92,312 @@ module {
   };
 
   /// Compute coverage score (0–10) from matched vs total required items.
-  public func coverageScore(matched : Nat, total : Nat) : Nat {
-    if (total == 0) return 10;
-    let pct = (matched * 100) / total;
-    pct / 10; // 0–100% → 0–10
+  public func coverageScore(_matched : Nat, total : Nat, coreMissing : Nat, secondaryMissing : Nat) : Nat {
+    // Safety: if the parser returned no requirements (should not happen after parse fix),
+    // return 50 (neutral) — NOT 100.  Returning 100 for 0/0 is false inflation.
+    if (total == 0) return 50;
+    var score : Int = 100;
+    score -= (coreMissing * 20 : Int);
+    score -= (secondaryMissing * 5 : Int);
+    if (score < 0) return 0;
+    score.toNat();
   };
 
   /// Compute stack-match score (0–10).
   /// Role-based: DevOps needs infra, Backend needs server/api, Fullstack needs both.
+  /// Compute stack-match score (0–100).
+  /// Role-aware: Frontend assignments are NOT penalised for lacking a database or server.
+  /// DevOps assignments are penalised for lacking infra tools.
   public func stackMatchScore(
-    parsed  : Types.ParsedAssignment,
-    signals : Types.RepoSignals,
+    signals        : Types.RepoSignals,
+    required_stack : [Text],
   ) : Nat {
-    let role = lower(parsed.role);
-    if (role.contains(#text "devops")) {
-      // Must have CI and at least docker or terraform
-      var score : Nat = 0;
-      if (signals.has_ci) score += 4;
-      if (signals.has_dockerfile or signals.has_compose) score += 3;
-      if (signals.has_terraform) score += 3;
-      score;
-    } else if (role.contains(#text "backend")) {
-      var score : Nat = 0;
-      if (signals.has_backend) score += 5;
-      if (signals.has_api_routes) score += 3;
-      if (signals.has_db_config) score += 2;
-      score;
-    } else if (role.contains(#text "fullstack")) {
-      var score : Nat = 0;
-      if (signals.has_backend) score += 3;
-      if (signals.has_frontend) score += 3;
-      if (signals.has_api_routes) score += 2;
-      if (signals.has_db_config) score += 2;
-      score;
-    } else if (role.contains(#text "frontend")) {
-      var score : Nat = 0;
-      if (signals.has_frontend) score += 6;
-      if (signals.has_api_routes or signals.has_backend) score += 2;
-      if (signals.has_auth) score += 2;
-      score;
-    } else {
-      // Unknown role: generic check
-      var score : Nat = 0;
-      if (signals.has_backend or signals.has_frontend) score += 4;
-      if (signals.has_api_routes) score += 3;
-      if (signals.has_db_config) score += 3;
-      score;
+    if (required_stack.size() == 0) {
+      var base : Nat = 60;
+      if (signals.has_backend or signals.has_frontend) base += 20;
+      if (signals.has_db_config) base += 10;
+      if (signals.has_api_routes) base += 10;
+      return Nat.min(base, 100);
     };
+    var score : Int = 100;
+    let coreKeywords : [Text] = ["react", "vue", "angular", "next", "node", "express", "django",
+      "fastapi", "flask", "spring", "rails", "laravel", "go", "rust", "java", "python",
+      "typescript", "postgres", "mysql", "mongodb", "redis", "graphql", "rest"];
+    let backendOnlyKeywords : [Text] = ["postgres", "mysql", "mongodb", "redis",
+      "database", "db", "express", "django", "fastapi", "flask", "spring",
+      "rails", "laravel", "server", "microservice", "graphql server", "rest api"];
+    let isFrontendOnlyAssignment : Bool =
+      required_stack.any(func(t) {
+        let tl = t.toLower();
+        tl.contains(#text "react") or tl.contains(#text "vue") or tl.contains(#text "angular") or
+        tl.contains(#text "svelte") or tl.contains(#text "next") or tl.contains(#text "gatsby") or
+        tl.contains(#text "tailwind") or tl.contains(#text "css") or tl.contains(#text "html") or
+        tl.contains(#text "ui") or tl.contains(#text "component") or tl.contains(#text "frontend")
+      }) and not required_stack.any(func(t) {
+        let tl = t.toLower();
+        tl.contains(#text "express") or tl.contains(#text "django") or tl.contains(#text "fastapi") or
+        tl.contains(#text "postgres") or tl.contains(#text "mongodb") or tl.contains(#text "rest api")
+      });
+    for (tech in required_stack.values()) {
+      let tl = tech.toLower();
+      let isBackendOnly = isFrontendOnlyAssignment and
+        backendOnlyKeywords.any(func(k) { tl.contains(#text k) });
+      if (isBackendOnly) {
+        // Do not penalise frontend submissions for missing backend tech
+      } else {
+        // Check detected_frameworks from deep crawl first (most accurate)
+        let inDetected = signals.detected_frameworks.any(func(f) { f.toLower().contains(#text tl) });
+        let isPresent = inDetected or
+          pathsContain(signals.file_tree, tl) or
+          lower(signals.readme_text).contains(#text tl) or
+          (tl.contains(#text "docker") and (signals.has_dockerfile or signals.has_compose)) or
+          (tl.contains(#text "ci") and signals.has_ci) or
+          (tl.contains(#text "terraform") and signals.has_terraform) or
+          (tl.contains(#text "auth") and signals.has_auth) or
+          (tl.contains(#text "db") and signals.has_db_config) or
+          (tl.contains(#text "api") and signals.has_api_routes) or
+          (tl.contains(#text "backend") and signals.has_backend) or
+          (tl.contains(#text "frontend") and signals.has_frontend);
+        if (not isPresent) {
+          let isCore = coreKeywords.any(func(k) { tl.contains(#text k) });
+          score -= if (isCore) 15 else 8;
+        };
+      };
+    };
+    if (score < 0) return 0;
+    score.toNat();
   };
 
   /// Compute completeness score (0–10) from repo structure signals.
+  /// Compute completeness score (0–100) from repo structure signals.
+  /// Frontend-only repos are not penalised for lacking backend/API route files.
   public func completenessScore(signals : Types.RepoSignals) : Nat {
-    var score : Nat = 0;
-    if (signals.has_backend) score += 2;
-    if (signals.has_frontend) score += 2;
-    if (signals.has_dockerfile or signals.has_compose) score += 1;
-    if (signals.has_ci) score += 1;
-    if (signals.has_auth) score += 1;
-    if (signals.has_db_config) score += 1;
-    if (signals.has_api_routes) score += 1;
-    if (signals.readme_word_count > 50) score += 1;
-    Nat.min(score, 10);
+    var score : Int = 100;
+    let isFrontendOnly : Bool = signals.has_frontend and not signals.has_backend;
+    // Use source file TODO count if available (more accurate), else fallback to readme/path count
+    let effectiveTodos = if (signals.todo_count_source > 0) signals.todo_count_source
+                         else signals.todo_count;
+    let todoDeduction : Int = if (effectiveTodos >= 20) 40
+      else if (effectiveTodos >= 10) 25
+      else if (effectiveTodos >= 5)  15
+      else if (effectiveTodos >= 1)  5
+      else 0;
+    score -= todoDeduction;
+    // No implementation at all
+    if (not signals.has_backend and not signals.has_frontend and not signals.has_terraform) {
+      score -= 30;
+    };
+    // For backend/fullstack: penalise missing API routes
+    if (not isFrontendOnly and signals.has_backend and not signals.has_api_routes) {
+      score -= 10;
+    };
+    if (signals.file_count < 5) {
+      score -= 20;
+    } else if (signals.file_count < 10) {
+      score -= 10;
+    };
+    if (score < 0) return 0;
+    score.toNat();
   };
 
   /// Compute depth score (0–10) from real-implementation indicators.
-  public func depthScore(signals : Types.RepoSignals) : Nat {
-    var score : Nat = 0;
-    // More files = more depth
-    let fileCount = signals.file_tree.size();
-    if (fileCount >= 5)  score += 1;
-    if (fileCount >= 15) score += 1;
-    if (fileCount >= 30) score += 1;
-    if (fileCount >= 60) score += 1;
-    // real implementation indicators
-    if (signals.has_backend and signals.has_api_routes) score += 2;
-    if (signals.has_db_config) score += 1;
-    if (signals.has_auth) score += 1;
-    if (signals.has_ci) score += 1;
-    if (signals.has_terraform) score += 1;
-    Nat.min(score, 10);
+  /// Compute depth score (0–100) from real-implementation indicators.
+  /// Role-aware: for frontend-only repos, penalise lack of UI components/structure
+  /// rather than missing auth/db (which are backend concerns).
+  public func depthScore(signals : Types.RepoSignals, file_count : Nat) : Nat {
+    var score : Int = 100;
+    if (file_count < 5) {
+      score -= 40;
+    } else if (file_count < 15) {
+      score -= 20;
+    } else if (file_count < 30) {
+      score -= 10;
+    };
+    // Test coverage signal from deep crawl
+    if (signals.test_count == 0 and
+        signals.detected_frameworks.any(func(f) {
+          let fl = f.toLower();
+          fl == "jest" or fl == "vitest" or fl == "mocha" or fl == "jasmine" or fl == "pytest"
+        })) {
+      // Has a test framework but no tests found — significant deduction
+      score -= 20;
+    } else if (signals.test_count > 5) {
+      score += 5;  // meaningful test suite present
+    } else if (signals.test_count > 0) {
+      score += 2;  // some tests present
+    };
+    // For frontend-only repos, do not penalise for missing auth/db (backend concerns)
+    let isFrontendOnly : Bool = signals.has_frontend and not signals.has_backend;
+    if (isFrontendOnly) {
+      let hasComponents = signals.file_tree.any(func(p) {
+        let pl = p.toLower();
+        pl.contains(#text "components/") or pl.contains(#text "pages/") or
+        pl.contains(#text "hooks/") or pl.contains(#text "context/") or pl.contains(#text "store/")
+      });
+      if (not hasComponents) score -= 10;
+      if (signals.has_ci) score += 5;
+    } else {
+      if (not signals.has_auth) score -= 10;
+      if (not signals.has_db_config) score -= 5;
+      if (not signals.has_ci) score -= 5;
+    };
+    if (signals.error_handler_count >= 3) {
+      score += 10;
+    } else if (signals.error_handler_count >= 1) {
+      score += 5;
+    };
+    if (score < 0) return 0;
+    Nat.min(score.toNat(), 100);
   };
 
   /// Compute docs score (0–10) from README word count and setup clarity.
   /// 0-3 if README < 100 chars, 4-7 if 100-2000 chars, 8-10 if > 2000 chars with setup keywords
+  /// Compute docs score (0–100) from README word count and setup clarity.
+  /// Frontend-only projects are not penalised for lacking API documentation.
   public func docsScore(signals : Types.RepoSignals) : Nat {
-    let chars = signals.readme_text.size();
-    if (chars < 100) {
-      // Score 0-3 based on word count
-      if (signals.readme_word_count == 0) return 0;
-      if (signals.readme_word_count < 10) return 1;
-      if (signals.readme_word_count < 20) return 2;
-      return 3;
-    } else if (chars <= 2000) {
-      // Score 4-7
-      var score : Nat = 4;
-      let readme = lower(signals.readme_text);
-      if (readme.contains(#text "install")) score += 1;
-      if (readme.contains(#text "usage") or readme.contains(#text "how to")) score += 1;
-      if (readme.contains(#text "setup") or readme.contains(#text "getting started")) score += 1;
-      Nat.min(score, 7);
-    } else {
-      // Score 8-10 — long README with setup clarity keywords
-      var score : Nat = 8;
-      let readme = lower(signals.readme_text);
-      let hasSetup = readme.contains(#text "setup") or readme.contains(#text "getting started") or readme.contains(#text "installation");
-      let hasUsage = readme.contains(#text "usage") or readme.contains(#text "how to run") or readme.contains(#text "running locally");
-      if (hasSetup) score += 1;
-      if (hasUsage) score += 1;
-      Nat.min(score, 10);
-    };
+    var score : Int = 100;
+    let readme = lower(signals.readme_text);
+    let isFrontendOnly : Bool = signals.has_frontend and not signals.has_backend;
+    let hasArchitecture = readme.contains(#text "architecture") or readme.contains(#text "system design") or readme.contains(#text "overview") or readme.contains(#text "about");
+    // API docs only matter for backend/fullstack assignments
+    let hasApiDocs = isFrontendOnly or readme.contains(#text "api") or readme.contains(#text "endpoint") or readme.contains(#text "route");
+    let hasSetupGuide = readme.contains(#text "install") or readme.contains(#text "setup") or
+                        readme.contains(#text "getting started") or readme.contains(#text "running") or
+                        readme.contains(#text "npm") or readme.contains(#text "yarn") or
+                        readme.contains(#text "usage");
+    if (not hasArchitecture) score -= 15;
+    if (not hasApiDocs) score -= 10;       // always false for frontend-only (skipped above)
+    if (not hasSetupGuide) score -= 10;
+    if (signals.readme_word_count < 100) score -= 20
+    else if (signals.readme_word_count < 200) score -= 10;
+    if (score < 0) return 0;
+    score.toNat();
   };
 
-  /// Compute demo score (0 or 10).
+  /// Compute demo readiness score (0–100).
+  /// Tier 1 (90–100): verified live demo (HTTP check passed).
+  /// Tier 2 (60):     demo link in README but HTTP verification failed/skipped.
+  ///                  Link exists and MAY work — do NOT drop to 0.
+  /// Tier 3 (70):     Dockerfile / docker-compose (can be spun up).
+  /// Tier 4 (55):     start/dev scripts in package.json.
+  /// Tier 5 (40):     proper README with setup instructions.
+  /// Tier 6 (25):     some docs but minimal setup.
+  /// Tier 7 (10):     README exists but no setup info.
+  /// ONLY 0  if repo is completely empty / unreachable.
   public func demoScore(signals : Types.RepoSignals) : Nat {
-    if (signals.has_demo_link) 10 else 0;
+    // Tier 1 & 2: demo link present
+    if (signals.has_demo_link) {
+      if (signals.has_working_demo_link) {
+        // Verified live demo
+        return if (signals.has_dockerfile_multistage) 100 else 90;
+      } else {
+        // Link exists but HTTP verification failed or was not performed.
+        // The link may still be a valid deployment — do NOT punish heavily.
+        // Base score 60; boost slightly for additional setup signals.
+        var s : Int = 60;
+        if (signals.has_dockerfile or signals.has_compose) s += 5;
+        if (signals.has_scripts or signals.has_setup_script) s += 5;
+        return Nat.min(s.toNat(), 75);
+      };
+    };
+
+    // No demo link — score purely on setup / deployment readiness
+    var setupScore : Int = 0;
+
+    if (signals.has_dockerfile_multistage) {
+      setupScore := 70;
+    } else if (signals.has_compose) {
+      setupScore := 65;
+    } else if (signals.has_dockerfile) {
+      setupScore := 62;
+    };
+
+    if (signals.has_scripts) setupScore += 10;
+    if (signals.has_setup_script) setupScore += 8;
+    if (signals.has_env_example) setupScore += 5;
+
+    // README quality boosts
+    let readmeLower = lower(signals.readme_text);
+    let hasSetup = readmeLower.contains(#text "install") or
+                   readmeLower.contains(#text "getting started") or
+                   readmeLower.contains(#text "how to run") or
+                   readmeLower.contains(#text "setup");
+    let hasRunCmd = readmeLower.contains(#text "npm start") or
+                    readmeLower.contains(#text "yarn start") or
+                    readmeLower.contains(#text "npm run dev") or
+                    readmeLower.contains(#text "docker") or
+                    readmeLower.contains(#text "make ") or
+                    readmeLower.contains(#text "./ ");
+
+    if (setupScore > 0) {
+      // Already has Docker/scripts — small README boost
+      if (hasSetup) setupScore += 5;
+      return Nat.min(setupScore.toNat(), 80);
+    };
+
+    // No Docker, no scripts
+    if (hasSetup and hasRunCmd) return 40;
+    if (hasSetup) return 30;
+    if (signals.readme_word_count > 100) return 25;
+    if (signals.readme_word_count > 20) return 10;
+
+    // Truly empty repo or completely unreachable
+    0;
   };
 
   /// Compute AI usage bonus score (0 or 10).
   /// This is a BONUS only — missing ai_log does NOT penalize the candidate.
   /// If present and the readme/signals are meaningful, it's a positive signal.
-  public func aiUsageScore(signals : Types.RepoSignals) : Nat {
-    if (signals.has_ai_log) 10 else 0;
+  public func aiUsageScore(
+    signals           : Types.RepoSignals,
+    has_prompt_log    : Bool,
+    ignore_prompt_log : Bool,
+  ) : Nat {
+    if (ignore_prompt_log) return 50;
+    // Neutral baseline: 60 when no AI/prompt log is present.
+    // This reflects "no signal" rather than a perfect score, preventing
+    // repos without any AI log from inflating the composite via the 10% AI weight.
+    var score : Int = 60;
+    if (has_prompt_log) {
+      // Valid prompt log present — boost toward full score
+      score := 100;
+    } else {
+      // No prompt log — check for boilerplate patterns and deduct further
+      let boilerplateRisk = signals.has_frontend and not signals.has_backend and not signals.has_db_config;
+      if (boilerplateRisk) score -= 20;
+    };
+    if (score < 0) return 0;
+    Nat.min(score.toNat(), 100);
   };
 
   /// Derive alignment verdict from final score.
-  public func alignmentFromScore(finalScore : Nat) : Types.Alignment {
-    if (finalScore >= 7) #High
-    else if (finalScore >= 4) #Medium
+  public func alignmentFromScore(finalScore_ : Nat) : Types.Alignment {
+    if (finalScore_ >= 80) #High
+    else if (finalScore_ >= 60) #Medium
     else #Low;
   };
 
   /// Determine project type label from parsed role and signals.
+  /// Determine project type label from parsed role and signals.
+  /// The parsed role takes priority; signals are used only as a fallback.
   public func projectType(
     parsed  : Types.ParsedAssignment,
     signals : Types.RepoSignals,
   ) : Text {
     let role = lower(parsed.role);
-    if (role.contains(#text "devops")) "DevOps"
+    // Explicit role label from assignment parser — highest priority
+    if (role.contains(#text "devops"))                        "DevOps"
     else if (role.contains(#text "fullstack") or role.contains(#text "full-stack") or role.contains(#text "full stack")) "Fullstack"
-    else if (role.contains(#text "backend") or role.contains(#text "back-end") or role.contains(#text "back end")) "Backend"
+    else if (role.contains(#text "backend") or role.contains(#text "back-end") or role.contains(#text "back end"))  "Backend"
     else if (role.contains(#text "frontend") or role.contains(#text "front-end") or role.contains(#text "front end")) "Frontend"
-    else if (signals.has_terraform or signals.has_ci) "DevOps"
-    else if (signals.has_backend and signals.has_frontend) "Fullstack"
-    else if (signals.has_backend) "Backend"
-    else if (signals.has_frontend) "Frontend"
+    else if (role.contains(#text "mobile"))                   "Mobile"
+    else if (role.contains(#text "qa"))                       "QA"
+    else if (role.contains(#text "ml") or role.contains(#text "machine learning")) "ML"
+    // Signal-based fallback (only when role is "General" or unrecognised)
+    else if (signals.has_terraform or signals.has_ci)         "DevOps"
+    else if (signals.has_backend and signals.has_frontend)    "Fullstack"
+    else if (signals.has_backend)                             "Backend"
+    else if (signals.has_frontend)                            "Frontend"
     else "General";
   };
 
@@ -248,35 +410,33 @@ module {
   ) : [Text] {
     var flags : [Text] = [];
     let role = lower(parsed.role);
-
-    // Missing core requirement: coverage < 4
-    if (scores.coverage < 4) {
+    if (scores.coverage < 40) {
       flags := flags.concat(["Missing core requirements"]);
     };
-    // Wrong stack: stackMatch < 4
-    if (scores.stackMatch < 4) {
+    if (scores.stackMatch < 40) {
       flags := flags.concat(["Wrong or mismatched tech stack"]);
     };
-    // Only UI or only docs
-    if (signals.has_frontend and not signals.has_backend and not signals.has_terraform) {
+    // Only fire "no backend" warning when the assignment EXPECTS backend code.
+    // Skip entirely for Frontend-only and Mobile assignments — they should have no backend.
+    let isFrontendOrMobileRole : Bool =
+      role.contains(#text "frontend") or role.contains(#text "front-end") or
+      role.contains(#text "front end") or role.contains(#text "mobile");
+    if (not isFrontendOrMobileRole and
+        signals.has_frontend and not signals.has_backend and not signals.has_terraform) {
       flags := flags.concat(["Only frontend — no backend logic"]);
     };
-    if (not signals.has_frontend and not signals.has_backend and signals.readme_word_count > 50 and signals.file_tree.size() < 5) {
+    if (not signals.has_frontend and not signals.has_backend and signals.readme_word_count > 50 and signals.file_count < 5) {
       flags := flags.concat(["Only documentation — no implementation"]);
     };
-    // No backend when required
     if ((role.contains(#text "backend") or role.contains(#text "fullstack")) and not signals.has_backend) {
       flags := flags.concat(["No backend code found"]);
     };
-    // No infra when DevOps
     if (role.contains(#text "devops") and not signals.has_dockerfile and not signals.has_ci and not signals.has_terraform) {
       flags := flags.concat(["No infrastructure/DevOps files found"]);
     };
-    // No demo
-    if (scores.demo == 0) {
-      flags := flags.concat(["No demo link"]);
+    if (scores.demoReadiness == 0) {
+      flags := flags.concat(["Not demo-ready"]);
     };
-    // AI usage log is a BONUS — intentionally NOT added as a red flag if missing
     flags;
   };
 
@@ -292,15 +452,13 @@ module {
     signals       : Types.RepoSignals,
   ) : Text {
     let total = parsed.required_items.size();
-    let matched = if (total == 0) 0 else (scores.coverage * total) / 10;
+    let matched : Nat = if (total == 0) 0 else {
+      let missCount = missing_items.size();
+      let diff : Int = (total : Int) - (missCount : Int);
+      if (diff <= 0) 0 else diff.toNat()
+    };
 
-    // Line 1 — what they built and whether it matches (role + match level)
-    let matchDesc : Text =
-      if (scores.coverage >= 9) "fully matching"
-      else if (scores.coverage >= 7) "largely matching"
-      else if (scores.coverage >= 4) "partially matching"
-      else "poorly matching";
-
+    // ── Paragraph 1: OVERVIEW ──────────────────────────────────────────────
     let implDesc : Text =
       if (signals.has_backend and signals.has_frontend) "full-stack application"
       else if (signals.has_backend) "backend/API service"
@@ -308,71 +466,129 @@ module {
       else if (signals.has_terraform or signals.has_ci) "infrastructure/DevOps setup"
       else "project";
 
-    let line1 : Text = "Candidate submitted a " # implDesc # " " # matchDesc # " the " # parsed.role # " assignment requirements — " #
-      matched.toText() # " of " # total.toText() # " required tasks detected (Coverage: " # scores.coverage.toText() # "/10).";
-
-    // Line 2 — specific strengths (criteria that scored well)
-    var strengths : [Text] = [];
-    if (scores.stackMatch >= 7) { strengths := strengths.concat(["Stack Match: " # scores.stackMatch.toText() # "/10"]) };
-    if (scores.completeness >= 7) { strengths := strengths.concat(["Completeness: " # scores.completeness.toText() # "/10"]) };
-    if (scores.depth >= 7) { strengths := strengths.concat(["Implementation Depth: " # scores.depth.toText() # "/10"]) };
-    if (scores.docs >= 7) { strengths := strengths.concat(["Documentation: " # scores.docs.toText() # "/10"]) };
-    if (scores.demo == 10) { strengths := strengths.concat(["Live demo available"]) };
-    if (scores.aiUsage == 10) { strengths := strengths.concat(["AI usage log provided (bonus)"]) };
-
-    let line2 : Text = if (strengths.size() > 0) {
-      "Strengths: " # strengths.values().join(", ") # "."
+    let frameworkNote : Text = if (signals.detected_frameworks.size() > 0) {
+      let fwList = signals.detected_frameworks.sliceToArray(0, Nat.min(3, signals.detected_frameworks.size()));
+      " Stack detected from package.json: " # fwList.values().join(", ") # ".";
     } else {
-      "No dimension scored above 7/10 — overall execution is below expectations."
+      "";
     };
 
-    // Line 3 — specific weaknesses (criteria that scored poorly, actual criteria names)
-    var weaknesses : [Text] = [];
-    if (scores.coverage < 6) { weaknesses := weaknesses.concat(["Coverage: " # scores.coverage.toText() # "/10"]) };
-    if (scores.stackMatch < 5) { weaknesses := weaknesses.concat(["Stack Match: " # scores.stackMatch.toText() # "/10"]) };
-    if (scores.depth < 5) { weaknesses := weaknesses.concat(["Implementation Depth: " # scores.depth.toText() # "/10"]) };
-    if (scores.docs < 4) { weaknesses := weaknesses.concat(["Documentation: " # scores.docs.toText() # "/10"]) };
-    if (scores.demo == 0) { weaknesses := weaknesses.concat(["No live demo or deployment link detected"]) };
+    let coverageDesc : Text =
+      if (scores.coverage >= 90) "nearly all " # matched.toText() # " of " # total.toText() # " requirements are met"
+      else if (scores.coverage >= 70) matched.toText() # " of " # total.toText() # " requirements are met with some gaps"
+      else if (scores.coverage >= 50) "roughly " # matched.toText() # " of " # total.toText() # " requirements are present — significant gaps remain"
+      else "only " # matched.toText() # " of " # total.toText() # " requirements were found — core deliverables are missing";
 
-    // Append up to 2 specific missing criteria names
-    if (missing_items.size() > 0) {
-      let first2 = missing_items.sliceToArray(0, Nat.min(2, missing_items.size()));
-      weaknesses := weaknesses.concat(["Unmet criteria: " # first2.values().join(", ")]);
+    let overallQuality : Text =
+      if (final_score >= 90) "This is a near-flawless submission."
+      else if (final_score >= 80) "This is a strong, production-oriented submission."
+      else if (final_score >= 70) "This submission is solid but has a few notable gaps."
+      else if (final_score >= 60) "The submission is functional but falls short of production standards in several areas."
+      else if (final_score >= 40) "This is a partial submission with significant missing elements."
+      else "This submission does not meet the minimum bar for the role.";
+
+    let p1 = "OVERVIEW: This " # parsed.role # " submission presents a " # implDesc # " where " # coverageDesc # " (Coverage: " # scores.coverage.toText() # "/100)." # frameworkNote # " " # overallQuality # " Stack Match at " # scores.stackMatch.toText() # "/100 and a final score of " # final_score.toText() # "/100.";
+
+    // ── Paragraph 2: STRENGTHS ─────────────────────────────────────────────
+    var strongPoints : [Text] = [];
+    if (scores.coverage >= 70) {
+      strongPoints := strongPoints.concat(["Feature coverage is strong (" # scores.coverage.toText() # "/100) — " # matched.toText() # " of " # total.toText() # " required criteria are present"]);
     };
-
-    let line3 : Text = if (weaknesses.size() > 0) {
-      "Gaps: " # weaknesses.values().join("; ") # "."
+    if (scores.stackMatch >= 70) {
+      let fwNote = if (signals.detected_frameworks.size() > 0)
+        " (" # signals.detected_frameworks.sliceToArray(0, Nat.min(2, signals.detected_frameworks.size())).values().join(", ") # " confirmed)"
+        else "";
+      strongPoints := strongPoints.concat(["Stack alignment at " # scores.stackMatch.toText() # "/100" # fwNote]);
+    };
+    if (scores.depth >= 70) {
+      let depthNote = if (signals.test_count > 0)
+        "Implementation depth (" # scores.depth.toText() # "/100) is solid — " # signals.test_count.toText() # " test cases found"
+        else "Implementation depth (" # scores.depth.toText() # "/100) shows a mature engineering approach";
+      strongPoints := strongPoints.concat([depthNote]);
+    };
+    if (scores.docs >= 70) {
+      strongPoints := strongPoints.concat(["README documentation is thorough (" # scores.docs.toText() # "/100) — setup, architecture, and usage are addressed"]);
+    };
+    if (scores.demoReadiness >= 80) {
+      let demoNote = if (signals.has_working_demo_link) "Live demo verified and accessible"
+        else if (signals.has_dockerfile_multistage) "Multi-stage Dockerfile — production-grade deployment"
+        else if (signals.has_scripts) "package.json start/dev scripts present — easy local setup"
+        else "Demo readiness at " # scores.demoReadiness.toText() # "/100";
+      strongPoints := strongPoints.concat([demoNote]);
+    };
+    if (signals.has_ci) {
+      strongPoints := strongPoints.concat(["CI pipeline present — professional development workflow"]);
+    };
+    let p2 = if (strongPoints.size() > 0) {
+      "STRENGTHS: " # strongPoints.values().join("; ") # "."
     } else {
-      "No critical gaps identified — all key dimensions are at acceptable levels."
+      "STRENGTHS: No dimension scored above 70/100. The submission shows domain familiarity but lacks execution maturity for this role."
     };
 
-    // Line 4 — technical quality (depth + docs driven)
-    let qualityLabel : Text =
-      if (scores.depth >= 7 and scores.docs >= 6) "Production-grade quality"
-      else if (scores.depth >= 5 or scores.docs >= 5) "Acceptable technical quality"
-      else "Prototype-grade implementation";
+    // ── Paragraph 3: CRITICAL GAPS ─────────────────────────────────────────
+    var gapPoints : [Text] = [];
+    if (scores.coverage < 70) {
+      let missSlice = missing_items.sliceToArray(0, Nat.min(3, missing_items.size()));
+      let missNote = if (missSlice.size() > 0) " Missing: " # missSlice.values().join(", ") else "";
+      gapPoints := gapPoints.concat(["Coverage at " # scores.coverage.toText() # "/100 — key requirements are absent." # missNote]);
+    };
+    if (scores.stackMatch < 60) {
+      gapPoints := gapPoints.concat(["Stack match at " # scores.stackMatch.toText() # "/100 — required technologies missing or substituted"]);
+    };
+    if (scores.demoReadiness < 50) {
+      let demoGap = if (signals.has_demo_link and not signals.has_working_demo_link)
+        "Demo link present but unreachable — deployment is broken or not live"
+        else "No live demo or deployment setup — evaluator cannot run the app without manual effort";
+      gapPoints := gapPoints.concat([demoGap]);
+    };
+    if (scores.depth < 60) {
+      let todoNote = if (signals.todo_count_source > 0)
+        " (" # signals.todo_count_source.toText() # " TODO/FIXME stubs in source files)"
+        else if (signals.todo_count > 0) " (TODO markers detected)" else "";
+      gapPoints := gapPoints.concat(["Implementation depth at " # scores.depth.toText() # "/100" # todoNote # " — critical code paths show placeholder logic or missing error handling"]);
+    };
+    if (scores.docs < 50) {
+      gapPoints := gapPoints.concat(["README at " # scores.docs.toText() # "/100 — missing setup guide, architecture overview, or API docs"]);
+    };
+    if (scores.completeness < 60) {
+      gapPoints := gapPoints.concat(["Completeness at " # scores.completeness.toText() # "/100 — repo shows signs of incomplete implementation"]);
+    };
+    let p3 = if (gapPoints.size() > 0) {
+      "CRITICAL GAPS: " # gapPoints.values().join("; ") # "."
+    } else {
+      "CRITICAL GAPS: No critical gaps identified. All key dimensions are at acceptable levels."
+    };
 
-    let fileCountNote : Text =
-      if (signals.file_tree.size() >= 30) "substantial codebase (" # signals.file_tree.size().toText() # " files)"
-      else if (signals.file_tree.size() >= 10) "moderate codebase (" # signals.file_tree.size().toText() # " files)"
-      else "small codebase (" # signals.file_tree.size().toText() # " files)";
+    // ── Paragraph 4: RECOMMENDATION ────────────────────────────────────────
+    // Automatic leniency: coverage >= 85 AND depth >= 80 → minor gaps not held against candidate
+    let isStrongCandidate = scores.coverage >= 85 and scores.depth >= 80;
+    let fileCountNote =
+      if (signals.file_count >= 30) "substantial codebase (" # signals.file_count.toText() # " files)"
+      else if (signals.file_count >= 10) "moderate codebase (" # signals.file_count.toText() # " files)"
+      else "small codebase (" # signals.file_count.toText() # " files)";
+    let maturityNote =
+      if (scores.depth >= 80 and scores.docs >= 70) "production-grade maturity"
+      else if (scores.depth >= 60) "intermediate maturity with room for growth"
+      else "junior-to-mid level maturity";
+    let fetchedNote = if (signals.fetched_file_paths.size() > 0) {
+      let paths = signals.fetched_file_paths.sliceToArray(0, Nat.min(3, signals.fetched_file_paths.size()));
+      " Source files reviewed: " # paths.values().join(", ") # ".";
+    } else { "" };
+    let recommendation : Text =
+      if (final_score >= 80 or isStrongCandidate) {
+        "Recommend advancing to technical interview. " #
+        (if (isStrongCandidate and final_score >= 75)
+          "Strong candidate — coverage and depth both exceed the bar; minor gaps noted but not disqualifying. "
+          else "") #
+        "Final score: " # final_score.toText() # "/100."
+      } else if (final_score >= 60) {
+        "Proceed with caution — targeted technical screen recommended to probe identified gaps. Final score: " # final_score.toText() # "/100."
+      } else {
+        "Do not advance. Submission does not meet minimum requirements for " # parsed.role # ". Final score: " # final_score.toText() # "/100."
+      };
+    let p4 = "RECOMMENDATION: " # recommendation # " Code shows " # maturityNote # " — " # fileCountNote # "." # fetchedNote;
 
-    let line4 : Text = qualityLabel # " — " # fileCountNote # "; README word count indicates " #
-      (if (signals.readme_word_count > 300) "thorough" else if (signals.readme_word_count > 100) "adequate" else "minimal") #
-      " documentation (Depth: " # scores.depth.toText() # "/10, Docs: " # scores.docs.toText() # "/10).";
-
-    // Line 5 — final verdict rationale (cites score, key wins/losses)
-    let completedOf : Text = matched.toText() # " of " # total.toText() # " required tasks complete";
-    let demoNote    : Text = if (signals.has_demo_link) ", live demo available" else ", no live demo";
-    let stackNote   : Text = if (scores.stackMatch >= 7) ", strong stack alignment" else if (scores.stackMatch >= 4) ", partial stack alignment" else ", stack mismatch";
-    let line5 : Text = "With " # completedOf # demoNote # stackNote # " and a final score of " # final_score.toText() # "/10, " #
-      (if (final_score >= 9) "this candidate is an excellent fit for the role."
-       else if (final_score >= 7) "this candidate is a strong hire — recommend technical interview."
-       else if (final_score >= 5) "this candidate shows potential but needs further assessment."
-       else "this candidate does not meet the bar for this role.");
-
-    // Assemble all 5 lines
-    line1 # "\n" # line2 # "\n" # line3 # "\n" # line4 # "\n" # line5;
+    p1 # "\n\n" # p2 # "\n\n" # p3 # "\n\n" # p4;
   };
 
   /// Compute a short deterministic id for a history record from arbitrary text.
@@ -390,38 +606,58 @@ module {
   /// Base score = average of 6 core dimensions (coverage, stackMatch, completeness, depth, docs, demo).
   /// aiUsage is a BONUS: if ai_log is present (aiUsage == 10), add up to +0.5 to the base score.
   /// Result is clamped to max 10.
-  public func finalScore(scores : Types.Scores) : Nat {
-    let base = scores.coverage + scores.stackMatch + scores.completeness +
-               scores.depth + scores.docs + scores.demo;
-    let baseAvg = base / 6;
-    // Bonus: ai usage adds at most +0.5 → represented as: if aiUsage==10, add 1 to numerator before /6 → ~+0.17
-    // More accurately: bonus = aiUsage / 20 (rounds to 0 or 1 in integer math)
-    // To give meaningful +0.5 bonus without floats: use (base*2 + aiUsage/2) / 12 scaled up
-    // Simplest deterministic: base_score + (1 if aiUsage==10 AND base_avg >= 5, else 0), capped at 10
-    let bonus : Nat = if (scores.aiUsage == 10 and baseAvg >= 1) 1 else 0;
-    // To avoid over-inflating, only apply bonus if base is reasonable and result won't exceed 10
-    Nat.min(10, baseAvg + bonus);
+  public func finalScore(scores : Types.Scores, overrides : Types.WeightOverrides) : Nat {
+    let cov  = Float.min(100.0, scores.coverage.toFloat()       * overrides.coverage_mult);
+    let stk  = Float.min(100.0, scores.stackMatch.toFloat()     * overrides.stack_mult);
+    let comp = Float.min(100.0, scores.completeness.toFloat()   * overrides.completeness_mult);
+    let dep  = Float.min(100.0, scores.depth.toFloat()          * overrides.depth_mult);
+    let dr   = Float.min(100.0, scores.demoReadiness.toFloat()  * overrides.demoReadiness_mult);
+    let docs_ = Float.min(100.0, scores.docs.toFloat()          * overrides.docs_mult);
+    let ai   = Float.min(100.0, scores.aiUsage.toFloat()        * overrides.ai_mult);
+    let weighted = ((cov + stk) / 2.0 * 0.35) +
+                   ((comp + dep) / 2.0 * 0.35) +
+                   ((dr + docs_) / 2.0 * 0.20) +
+                   (ai * 0.10);
+    let rounded = weighted + 0.5;
+    let i = rounded.toInt();
+    let result = if (i < 0) 0 else i.toNat();
+    Nat.min(result, 100);
   };
 
-  /// Compute cache key: deterministic concatenation of repo_url + "|" + assignment text.
-  /// (SHA256 is not natively available in Motoko — use a stable deterministic composite key.)
   public func cacheKey(repoUrl : Text, assignmentDesc : Text) : Types.CacheKey {
     repoUrl # "|" # assignmentDesc;
   };
 
-  /// Compute assignment cache key: the raw assignment text (deterministic).
   public func assignmentCacheKey(assignmentText : Text) : Types.CacheKey {
     assignmentText;
   };
 
   // ── Weight override application ───────────────────────────────────────────
 
-  /// Clamp a Float score to [0.0, 10.0] then convert to Nat.
-  func clampScore(f : Float) : Nat {
-    let clamped = Float.max(0.0, Float.min(10.0, f));
-    // Float.toInt truncates toward zero; add 0.0 to avoid fractional issues
+  /// Clamp a Float score to [0.0, 100.0] then convert to Nat.
+  func clampScore100(f : Float) : Nat {
+    let clamped = Float.max(0.0, Float.min(100.0, f));
     let i = clamped.toInt();
     if (i < 0) 0 else i.toNat();
+  };
+
+  /// Strict verdict logic with dual knockouts.
+  public func verdictFromScore(score : Nat, scores : Types.Scores) : { #pass; #caution; #fail } {
+    // Knockout 2 (absolute): any single dimension < 30 = instant FAIL
+    if (scores.coverage < 30 or scores.stackMatch < 30 or scores.completeness < 30 or
+        scores.depth < 30 or scores.docs < 30 or scores.demoReadiness < 30 or scores.aiUsage < 30) {
+      return #fail;
+    };
+    // Base verdict from composite score
+    var verdict : { #pass; #caution; #fail } =
+      if (score >= 80) #pass
+      else if (score >= 60) #caution
+      else #fail;
+    // Knockout 1: Coverage or DemoReadiness < 50 caps at caution
+    if (scores.coverage < 50 or scores.demoReadiness < 50) {
+      if (verdict == #pass) verdict := #caution;
+    };
+    verdict;
   };
 
   /// Apply per-evaluation weight overrides to a Scores record.
@@ -429,13 +665,13 @@ module {
   /// finalScore is recomputed from the adjusted dimensions.
   public func applyWeightOverrides(scores : Types.Scores, overrides : Types.WeightOverrides) : Types.Scores {
     {
-      coverage     = clampScore(scores.coverage.toFloat()     * overrides.coverage_mult);
-      stackMatch   = clampScore(scores.stackMatch.toFloat()   * overrides.stack_mult);
-      completeness = clampScore(scores.completeness.toFloat() * overrides.completeness_mult);
-      depth        = clampScore(scores.depth.toFloat()        * overrides.depth_mult);
-      docs         = clampScore(scores.docs.toFloat()         * overrides.docs_mult);
-      demo         = clampScore(scores.demo.toFloat()         * overrides.demo_mult);
-      aiUsage      = clampScore(scores.aiUsage.toFloat()      * overrides.ai_mult);
+      coverage      = clampScore100(scores.coverage.toFloat()      * overrides.coverage_mult);
+      stackMatch    = clampScore100(scores.stackMatch.toFloat()     * overrides.stack_mult);
+      completeness  = clampScore100(scores.completeness.toFloat()   * overrides.completeness_mult);
+      depth         = clampScore100(scores.depth.toFloat()          * overrides.depth_mult);
+      docs          = clampScore100(scores.docs.toFloat()           * overrides.docs_mult);
+      demoReadiness = clampScore100(scores.demoReadiness.toFloat()  * overrides.demoReadiness_mult);
+      aiUsage       = clampScore100(scores.aiUsage.toFloat()        * overrides.ai_mult);
     };
   };
 
@@ -446,54 +682,70 @@ module {
   /// AI usage log is treated as a bonus only — never mentioned as a weakness.
   /// Verdict thresholds: >= 9 → Hire, 6-8 → Proceed with Caution, < 6 → No Hire.
   public func buildRecruiterVerdict(
-    final_score : Nat,
-    scores      : Types.Scores,
-    _signals    : Types.RepoSignals,
+    scores       : Types.Scores,
+    finalScore_  : Nat,
+    missingItems : [Text],
   ) : Types.RecruiterVerdict {
-    // Verdict and emoji — per requirements: >=8.5 Hire, 6-8.49 Caution, <6 No Hire
-    // In integer space: >=9 maps to Hire (8.5+ rounds to 9), 6-8 Caution, <6 No Hire
-    let (verdict, emoji) : (Text, Text) =
-      if (final_score >= 9) ("✅ Hire", "✅")
-      else if (final_score >= 6) ("⚠️ Proceed with Caution", "⚠️")
-      else ("❌ No Hire", "❌");
-
-    // Technical debt classification — based on depth and docs only
-    let technical_debt : Text =
-      if (scores.depth >= 7 and scores.docs >= 6)
-        "Production Ready"
-      else
-        "Prototype Grade";
-
-    // Why text — 2 plain-English sentences citing actual scores and specific dimensions
-    // Never mention missing AI usage log as a weakness
-    let baseAvgFor9 = (scores.coverage + scores.stackMatch + scores.completeness + scores.depth + scores.docs + scores.demo) / 6;
-    let why : Text =
-      if (final_score >= 9) {
-        "This candidate averaged " # baseAvgFor9.toText() # "/10 across all core dimensions, with particularly strong " #
-        (if (scores.coverage >= 8) "requirement coverage" else if (scores.depth >= 8) "implementation depth" else "technical execution") #
-        ". All key deliverables are present and the code quality is at a professional, hire-ready level."
-      } else if (final_score >= 8) {
-        "This submission scores " # final_score.toText() # "/10 and covers nearly all required criteria — " #
-        (if (scores.demo == 0) "the only notable gap is the absence of a live demo link"
-         else if (scores.docs < 6) "documentation could be more thorough"
-         else "minor gaps remain in a few dimensions") #
-        ". The candidate demonstrates strong technical ability and is recommended for a technical interview."
-      } else if (final_score >= 6) {
-        "This submission scores " # final_score.toText() # "/10 and meets several requirements but has gaps in " #
-        (if (scores.stackMatch < 5) "the expected technology stack (Stack Match: " # scores.stackMatch.toText() # "/10)"
-         else if (scores.coverage < 6) "requirement coverage (Coverage: " # scores.coverage.toText() # "/10)"
-         else if (scores.depth < 5) "implementation depth (Depth: " # scores.depth.toText() # "/10)"
-         else "completeness and depth") #
-        ". Proceed with a technical screen to probe these gaps before advancing."
-      } else if (final_score >= 4) {
-        "This submission scores " # final_score.toText() # "/10 and shows partial effort but misses key requirements. " #
-        (if (scores.stackMatch < 4) "The technology stack does not match what was expected for this role."
-         else "Core deliverables are incomplete and significant rework would be needed before this candidate could advance.")
-      } else {
-        "This submission scores " # final_score.toText() # "/10 and is missing most of the required deliverables. " #
-        "The candidate does not meet the minimum bar for this role as submitted."
+    let verdict = verdictFromScore(finalScore_, scores);
+    let emoji : Text =
+      switch verdict {
+        case (#pass)    "✅";
+        case (#caution) "⚠️";
+        case (#fail)    "❌";
       };
-
-    { verdict; emoji; why; technical_debt };
+    let technical_debt : Text =
+      if (scores.depth >= 70 and scores.docs >= 70 and finalScore_ >= 80) "Production Ready"
+      else if (finalScore_ >= 60) "Needs Work"
+      else "Prototype Grade";
+    let why : Text =
+      switch verdict {
+        case (#pass) {
+          "This candidate scored " # finalScore_.toText() # "/100 overall, with Coverage at " #
+          scores.coverage.toText() # ", Stack Match at " # scores.stackMatch.toText() #
+          ", and Demo Readiness at " # scores.demoReadiness.toText() # ". " #
+          "All dimensions are above the minimum bar and the submission meets the requirements for the role."
+        };
+        case (#caution) {
+          let gapDim : Text =
+            if (scores.coverage < 50) "Coverage (" # scores.coverage.toText() # "/100)"
+            else if (scores.demoReadiness < 50) "Demo Readiness (" # scores.demoReadiness.toText() # "/100)"
+            else if (scores.stackMatch < 60) "Stack Match (" # scores.stackMatch.toText() # "/100)"
+            else if (scores.depth < 60) "Implementation Depth (" # scores.depth.toText() # "/100)"
+            else "Completeness (" # scores.completeness.toText() # "/100)";
+          "This candidate scored " # finalScore_.toText() # "/100 overall but has a notable gap in " # gapDim # ". " #
+          "A technical screen is recommended to probe these gaps before advancing the candidate."
+        };
+        case (#fail) {
+          let worstDim : Text =
+            if (scores.coverage < 30) "Coverage (" # scores.coverage.toText() # "/100)"
+            else if (scores.demoReadiness < 30) "Demo Readiness (" # scores.demoReadiness.toText() # "/100)"
+            else if (scores.stackMatch < 30) "Stack Match (" # scores.stackMatch.toText() # "/100)"
+            else if (scores.completeness < 30) "Completeness (" # scores.completeness.toText() # "/100)"
+            else if (scores.depth < 30) "Depth (" # scores.depth.toText() # "/100)"
+            else "overall composite score (" # finalScore_.toText() # "/100)";
+          "This submission does not meet the minimum bar — the critical failure is in " # worstDim # ". " #
+          "Core requirements are missing or the application is not demo-ready; the candidate should not advance."
+        };
+      };
+    var strengthsList : [Text] = [];
+    if (scores.coverage >= 70)      strengthsList := strengthsList.concat(["Coverage: " # scores.coverage.toText() # "/100"]);
+    if (scores.stackMatch >= 70)    strengthsList := strengthsList.concat(["Stack Match: " # scores.stackMatch.toText() # "/100"]);
+    if (scores.completeness >= 70)  strengthsList := strengthsList.concat(["Completeness: " # scores.completeness.toText() # "/100"]);
+    if (scores.depth >= 70)         strengthsList := strengthsList.concat(["Implementation Depth: " # scores.depth.toText() # "/100"]);
+    if (scores.docs >= 70)          strengthsList := strengthsList.concat(["Documentation: " # scores.docs.toText() # "/100"]);
+    if (scores.demoReadiness >= 70) strengthsList := strengthsList.concat(["Demo Readiness: " # scores.demoReadiness.toText() # "/100"]);
+    if (scores.aiUsage >= 70)       strengthsList := strengthsList.concat(["AI Usage: " # scores.aiUsage.toText() # "/100"]);
+    var gapsList : [Text] = [];
+    if (scores.coverage < 50)      gapsList := gapsList.concat(["Coverage below 50 (" # scores.coverage.toText() # ")"]);
+    if (scores.stackMatch < 50)    gapsList := gapsList.concat(["Stack Match below 50 (" # scores.stackMatch.toText() # ")"]);
+    if (scores.completeness < 50)  gapsList := gapsList.concat(["Completeness below 50 (" # scores.completeness.toText() # ")"]);
+    if (scores.depth < 50)         gapsList := gapsList.concat(["Depth below 50 (" # scores.depth.toText() # ")"]);
+    if (scores.docs < 50)          gapsList := gapsList.concat(["Docs below 50 (" # scores.docs.toText() # ")"]);
+    if (scores.demoReadiness < 50) gapsList := gapsList.concat(["Demo Readiness below 50 (" # scores.demoReadiness.toText() # ")"]);
+    let topMissing = missingItems.sliceToArray(0, Nat.min(3, missingItems.size()));
+    for (item in topMissing.values()) {
+      gapsList := gapsList.concat(["Missing: " # item]);
+    };
+    { verdict; emoji; why; technical_debt; strengths = strengthsList; criticalGaps = gapsList };
   };
 };

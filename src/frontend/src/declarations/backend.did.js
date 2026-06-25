@@ -9,8 +9,8 @@
 import { IDL } from '@icp-sdk/core/candid';
 
 export const Scores = IDL.Record({
+  'demoReadiness' : IDL.Nat,
   'stackMatch' : IDL.Nat,
-  'demo' : IDL.Nat,
   'docs' : IDL.Nat,
   'coverage' : IDL.Nat,
   'completeness' : IDL.Nat,
@@ -25,12 +25,19 @@ export const Alignment = IDL.Variant({
 });
 export const RecruiterVerdict = IDL.Record({
   'why' : IDL.Text,
+  'strengths' : IDL.Vec(IDL.Text),
   'emoji' : IDL.Text,
-  'verdict' : IDL.Text,
+  'verdict' : IDL.Variant({
+    'fail' : IDL.Null,
+    'pass' : IDL.Null,
+    'caution' : IDL.Null,
+  }),
   'technical_debt' : IDL.Text,
+  'criticalGaps' : IDL.Vec(IDL.Text),
 });
 export const EvaluationResult = IDL.Record({
   'applied_instructions' : IDL.Vec(IDL.Text),
+  'strengths' : IDL.Vec(IDL.Text),
   'scores' : Scores,
   'summary' : IDL.Text,
   'missing_items' : IDL.Vec(IDL.Text),
@@ -41,6 +48,7 @@ export const EvaluationResult = IDL.Record({
   'project_type' : IDL.Text,
   'alignment' : Alignment,
   'recruiter_verdict' : IDL.Opt(RecruiterVerdict),
+  'criticalGaps' : IDL.Vec(IDL.Text),
 });
 export const ExtractTextResult = IDL.Variant({
   'ok' : IDL.Record({ 'text' : IDL.Text, 'is_clean' : IDL.Bool }),
@@ -136,8 +144,8 @@ export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
   const Scores = IDL.Record({
+    'demoReadiness' : IDL.Nat,
     'stackMatch' : IDL.Nat,
-    'demo' : IDL.Nat,
     'docs' : IDL.Nat,
     'coverage' : IDL.Nat,
     'completeness' : IDL.Nat,
@@ -152,12 +160,19 @@ export const idlFactory = ({ IDL }) => {
   });
   const RecruiterVerdict = IDL.Record({
     'why' : IDL.Text,
+    'strengths' : IDL.Vec(IDL.Text),
     'emoji' : IDL.Text,
-    'verdict' : IDL.Text,
+    'verdict' : IDL.Variant({
+      'fail' : IDL.Null,
+      'pass' : IDL.Null,
+      'caution' : IDL.Null,
+    }),
     'technical_debt' : IDL.Text,
+    'criticalGaps' : IDL.Vec(IDL.Text),
   });
   const EvaluationResult = IDL.Record({
     'applied_instructions' : IDL.Vec(IDL.Text),
+    'strengths' : IDL.Vec(IDL.Text),
     'scores' : Scores,
     'summary' : IDL.Text,
     'missing_items' : IDL.Vec(IDL.Text),
@@ -168,6 +183,7 @@ export const idlFactory = ({ IDL }) => {
     'project_type' : IDL.Text,
     'alignment' : Alignment,
     'recruiter_verdict' : IDL.Opt(RecruiterVerdict),
+    'criticalGaps' : IDL.Vec(IDL.Text),
   });
   const ExtractTextResult = IDL.Variant({
     'ok' : IDL.Record({ 'text' : IDL.Text, 'is_clean' : IDL.Bool }),

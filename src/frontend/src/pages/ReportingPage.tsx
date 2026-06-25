@@ -41,8 +41,8 @@ import type { EvaluationRecord, RecruiterVerdict } from "../types";
 // ─── Color helpers ────────────────────────────────────────────────────────────
 
 function scoreColor(score: number): string {
-  if (score >= 8.5) return CHART_COLORS.green;
-  if (score >= 6.0) return CHART_COLORS.yellow;
+  if (score >= 70) return CHART_COLORS.green;
+  if (score >= 40) return CHART_COLORS.yellow;
   return CHART_COLORS.red;
 }
 
@@ -69,8 +69,8 @@ const PLACEHOLDER_DONUT_COLORS = ["#c7d2fe", "#ddd6fe", "#e9d5ff"];
 // ─── Score Badge ──────────────────────────────────────────────────────────────
 
 function scoreBadgeClasses(score: number): string {
-  if (score >= 8.5) return "text-[#4ade80] bg-[#4ade80]/10 border-[#4ade80]/30";
-  if (score >= 6.0) return "text-[#facc15] bg-[#facc15]/10 border-[#facc15]/30";
+  if (score >= 70) return "text-[#4ade80] bg-[#4ade80]/10 border-[#4ade80]/30";
+  if (score >= 40) return "text-[#facc15] bg-[#facc15]/10 border-[#facc15]/30";
   return "text-[#f87171] bg-[#f87171]/10 border-[#f87171]/30";
 }
 
@@ -82,24 +82,33 @@ function ScoreBadge({ score }: { score: number }) {
         scoreBadgeClasses(score),
       ].join(" ")}
     >
-      {score.toFixed(1)}/10
+      {Math.round(score)}/100
     </span>
   );
 }
 
 // ─── Verdict Badge ────────────────────────────────────────────────────────────
 
-function deriveVerdict(
-  score: number,
-): Pick<RecruiterVerdict, "verdict" | "emoji"> {
-  if (score >= 8.5) return { verdict: "Highly Recommended", emoji: "✅" };
-  if (score >= 6.0) return { verdict: "Proceed with Caution", emoji: "⚠️" };
-  return { verdict: "Not Recommended", emoji: "❌" };
+function deriveVerdict(score: number): { verdict: string; emoji: string } {
+  if (score >= 80) return { verdict: "PASS", emoji: "✅" };
+  if (score >= 60) return { verdict: "CAUTION", emoji: "⚠️" };
+  return { verdict: "FAIL", emoji: "❌" };
 }
 
 function VerdictBadge({ record }: { record: EvaluationRecord }) {
   const score = Number(record.result.final_score);
-  const { emoji, verdict } = deriveVerdict(score);
+  const backendVerdict = record.result.recruiter_verdict?.verdict;
+  // Map backend Motoko variant enum (lowercase) to display label
+  const verdictDisplayMap: Record<string, { emoji: string; verdict: string }> =
+    {
+      pass: { emoji: "✅", verdict: "PASS" },
+      caution: { emoji: "⚠️", verdict: "CAUTION" },
+      fail: { emoji: "❌", verdict: "FAIL" },
+    };
+  const displayed = backendVerdict
+    ? (verdictDisplayMap[String(backendVerdict)] ?? deriveVerdict(score))
+    : deriveVerdict(score);
+  const { emoji, verdict } = displayed;
   return (
     <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-muted/50 border border-border text-foreground font-medium shrink-0">
       <span aria-hidden="true">{emoji}</span>
@@ -134,9 +143,9 @@ function generateCandidateBrief(record: EvaluationRecord): void {
   const missingItems = record.result.missing_items ?? [];
   const redFlags = record.result.red_flags ?? [];
   const debtLabel =
-    score >= 8.5
+    score >= 80
       ? "Production Ready"
-      : score >= 6
+      : score >= 60
         ? "Needs Polish"
         : "Prototype Grade";
 
@@ -147,7 +156,7 @@ function generateCandidateBrief(record: EvaluationRecord): void {
 </head>
 <body><div class="card">
 <div class="header"><div><div class="title">@${record.owner || "Unknown"}</div><div class="subtitle">${record.repo_url}</div><div style="margin-top:.4rem;font-size:.78rem;color:#64748b">Role: <strong>${role}</strong> &nbsp;·&nbsp; Evaluated: <strong>${date}</strong></div></div>
-<div class="score-badge ${score >= 8.5 ? "score-green" : score >= 6 ? "score-yellow" : "score-red"}">${score.toFixed(1)}<span style="font-size:.9rem;font-weight:400">/10</span></div></div>
+<div class="score-badge ${score >= 80 ? "score-green" : score >= 60 ? "score-yellow" : "score-red"}">${score.toFixed(1)}<span style="font-size:.9rem;font-weight:400">/100</span></div></div>
 <div class="verdict"><div class="verdict-title">Recruiter's Verdict</div><div class="verdict-value">${emoji} ${verdict}</div><div style="margin-top:.4rem;font-size:.78rem;color:#64748b">${debtLabel}</div></div>
 <div class="section summary"><div class="section-title">Summary</div>${summaryLines.map((l) => `<p>${l}</p>`).join("")}</div>
 <div class="section"><div class="section-title">Score Breakdown</div><div class="scores-grid">
@@ -156,7 +165,7 @@ function generateCandidateBrief(record: EvaluationRecord): void {
 <div class="score-cell"><div class="label">Complete</div><div class="value">${fmt(scores.completeness)}</div></div>
 <div class="score-cell"><div class="label">Depth</div><div class="value">${fmt(scores.depth)}</div></div>
 <div class="score-cell"><div class="label">Docs</div><div class="value">${fmt(scores.docs)}</div></div>
-<div class="score-cell"><div class="label">Demo</div><div class="value">${fmt(scores.demo)}</div></div>
+<div class="score-cell"><div class="label">Demo</div><div class="value">${fmt(scores.demoReadiness)}</div></div>
 <div class="score-cell"><div class="label">AI Usage</div><div class="value">${fmt(scores.aiUsage)}</div></div>
 <div class="score-cell"><div class="label">Alignment</div><div class="value" style="font-size:.75rem">${record.result.alignment}</div></div>
 </div></div>
@@ -365,7 +374,7 @@ function RoleBarChart({
             tickLine={false}
           />
           <YAxis
-            domain={[0, 10]}
+            domain={[0, 100]}
             tick={{ fontSize: 10, fill: "#94a3b8" }}
             axisLine={false}
             tickLine={false}
@@ -439,7 +448,7 @@ function TrendLineChart({
             tickLine={false}
           />
           <YAxis
-            domain={[0, 10]}
+            domain={[0, 100]}
             tick={{ fontSize: 10, fill: "#94a3b8" }}
             axisLine={false}
             tickLine={false}
@@ -629,7 +638,7 @@ function MetricBarBreakdown({
             <div
               className="h-full rounded-full transition-all duration-500"
               style={{
-                width: hasData ? `${(item.avg / 10) * 100}%` : "6%",
+                width: hasData ? `${item.avg}%` : "6%",
                 backgroundColor: hasData
                   ? scoreColor(item.avg)
                   : PLACEHOLDER_BAR_COLOR,
@@ -862,9 +871,9 @@ function DashboardSection({
           ocid="dashboard.kpi.avg_score"
           label="Avg Final Score"
           value={kpis.total > 0 ? kpis.avgScore.toFixed(1) : "—"}
-          sub={noData ? undefined : "Out of 10 — higher is better"}
+          sub={noData ? undefined : "Out of 100 — higher is better"}
           isEmpty={noData}
-          emptyHint="Average score out of 10 across all evals"
+          emptyHint="Average score out of 100 across all evals"
           icon={<BarChart2 className="w-4 h-4" />}
           accentColor={CHART_COLORS.blue}
         />
@@ -872,9 +881,9 @@ function DashboardSection({
           ocid="dashboard.kpi.pass_rate"
           label="Pass Rate"
           value={kpis.total > 0 ? `${kpis.passRate}%` : "—"}
-          sub={noData ? undefined : "Score ≥ 8.5"}
+          sub={noData ? undefined : "Score ≥ 80"}
           isEmpty={noData}
-          emptyHint="% of candidates scoring ≥ 8.5 (Hire)"
+          emptyHint="% of candidates scoring ≥ 80 (Hire)"
           icon={<CheckCircle2 className="w-4 h-4" />}
           accentColor={CHART_COLORS.green}
         />
@@ -882,16 +891,16 @@ function DashboardSection({
           ocid="dashboard.kpi.caution_rate"
           label="Caution Rate"
           value={kpis.total > 0 ? `${kpis.cautionRate}%` : "—"}
-          sub={noData ? undefined : "Score 6–8.4"}
+          sub={noData ? undefined : "Score 60-79"}
           isEmpty={noData}
-          emptyHint="% of candidates in the 6–8.4 range"
+          emptyHint="% of candidates in the 60–79 range"
           icon={<AlertTriangle className="w-4 h-4" />}
           accentColor={CHART_COLORS.yellow}
         />
         <KpiCard
           ocid="dashboard.kpi.top_score"
           label="Top Score"
-          value={kpis.total > 0 ? `${kpis.topScore}/10` : "—"}
+          value={kpis.total > 0 ? `${kpis.topScore}/100` : "—"}
           sub={
             noData
               ? undefined
@@ -911,7 +920,7 @@ function DashboardSection({
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-destructive/5 border border-destructive/20 w-fit">
           <XCircle className="w-4 h-4 text-destructive shrink-0" />
           <span className="text-xs text-destructive font-medium">
-            {kpis.failRate}% Not Recommended — scores below 6.0
+            {kpis.failRate}% Not Recommended — scores below 60
           </span>
         </div>
       )}
@@ -923,7 +932,7 @@ function DashboardSection({
           subtitle={
             noData
               ? "Will show bars for each role you evaluate"
-              : "Color-coded: green ≥8.5 · yellow ≥6 · red <6"
+              : "Color-coded: green ≥70 · yellow ≥40 · red <40"
           }
           ocid="dashboard.chart.role_bar"
         >

@@ -28055,8 +28055,8 @@ const __iconNode = [
 ];
 const X = createLucideIcon("x", __iconNode);
 const Scores = Record({
+  "demoReadiness": Nat,
   "stackMatch": Nat,
-  "demo": Nat,
   "docs": Nat,
   "coverage": Nat,
   "completeness": Nat,
@@ -28071,12 +28071,19 @@ const Alignment$1 = Variant({
 });
 const RecruiterVerdict = Record({
   "why": Text$1,
+  "strengths": Vec(Text$1),
   "emoji": Text$1,
-  "verdict": Text$1,
-  "technical_debt": Text$1
+  "verdict": Variant({
+    "fail": Null,
+    "pass": Null,
+    "caution": Null
+  }),
+  "technical_debt": Text$1,
+  "criticalGaps": Vec(Text$1)
 });
 const EvaluationResult = Record({
   "applied_instructions": Vec(Text$1),
+  "strengths": Vec(Text$1),
   "scores": Scores,
   "summary": Text$1,
   "missing_items": Vec(Text$1),
@@ -28086,7 +28093,8 @@ const EvaluationResult = Record({
   "red_flags": Vec(Text$1),
   "project_type": Text$1,
   "alignment": Alignment$1,
-  "recruiter_verdict": Opt(RecruiterVerdict)
+  "recruiter_verdict": Opt(RecruiterVerdict),
+  "criticalGaps": Vec(Text$1)
 });
 const ExtractTextResult = Variant({
   "ok": Record({ "text": Text$1, "is_clean": Bool }),
@@ -28178,8 +28186,8 @@ Service({
 });
 const idlFactory = ({ IDL: IDL2 }) => {
   const Scores2 = IDL2.Record({
+    "demoReadiness": IDL2.Nat,
     "stackMatch": IDL2.Nat,
-    "demo": IDL2.Nat,
     "docs": IDL2.Nat,
     "coverage": IDL2.Nat,
     "completeness": IDL2.Nat,
@@ -28194,12 +28202,19 @@ const idlFactory = ({ IDL: IDL2 }) => {
   });
   const RecruiterVerdict2 = IDL2.Record({
     "why": IDL2.Text,
+    "strengths": IDL2.Vec(IDL2.Text),
     "emoji": IDL2.Text,
-    "verdict": IDL2.Text,
-    "technical_debt": IDL2.Text
+    "verdict": IDL2.Variant({
+      "fail": IDL2.Null,
+      "pass": IDL2.Null,
+      "caution": IDL2.Null
+    }),
+    "technical_debt": IDL2.Text,
+    "criticalGaps": IDL2.Vec(IDL2.Text)
   });
   const EvaluationResult2 = IDL2.Record({
     "applied_instructions": IDL2.Vec(IDL2.Text),
+    "strengths": IDL2.Vec(IDL2.Text),
     "scores": Scores2,
     "summary": IDL2.Text,
     "missing_items": IDL2.Vec(IDL2.Text),
@@ -28209,7 +28224,8 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "red_flags": IDL2.Vec(IDL2.Text),
     "project_type": IDL2.Text,
     "alignment": Alignment2,
-    "recruiter_verdict": IDL2.Opt(RecruiterVerdict2)
+    "recruiter_verdict": IDL2.Opt(RecruiterVerdict2),
+    "criticalGaps": IDL2.Vec(IDL2.Text)
   });
   const ExtractTextResult2 = IDL2.Variant({
     "ok": IDL2.Record({ "text": IDL2.Text, "is_clean": IDL2.Bool }),
@@ -28367,42 +28383,42 @@ class Backend {
     if (this.processError) {
       try {
         const result = await this.actor.extractFileText(arg0, arg1);
-        return from_candid_ExtractTextResult_n8(this._uploadFile, this._downloadFile, result);
+        return from_candid_ExtractTextResult_n11(this._uploadFile, this._downloadFile, result);
       } catch (e3) {
         this.processError(e3);
         throw new Error("unreachable");
       }
     } else {
       const result = await this.actor.extractFileText(arg0, arg1);
-      return from_candid_ExtractTextResult_n8(this._uploadFile, this._downloadFile, result);
+      return from_candid_ExtractTextResult_n11(this._uploadFile, this._downloadFile, result);
     }
   }
   async extractNotesFileText(arg0, arg1) {
     if (this.processError) {
       try {
         const result = await this.actor.extractNotesFileText(arg0, arg1);
-        return from_candid_ExtractTextResult_n8(this._uploadFile, this._downloadFile, result);
+        return from_candid_ExtractTextResult_n11(this._uploadFile, this._downloadFile, result);
       } catch (e3) {
         this.processError(e3);
         throw new Error("unreachable");
       }
     } else {
       const result = await this.actor.extractNotesFileText(arg0, arg1);
-      return from_candid_ExtractTextResult_n8(this._uploadFile, this._downloadFile, result);
+      return from_candid_ExtractTextResult_n11(this._uploadFile, this._downloadFile, result);
     }
   }
   async fetchGoogleDocText(arg0) {
     if (this.processError) {
       try {
         const result = await this.actor.fetchGoogleDocText(arg0);
-        return from_candid_ExtractTextResult_n8(this._uploadFile, this._downloadFile, result);
+        return from_candid_ExtractTextResult_n11(this._uploadFile, this._downloadFile, result);
       } catch (e3) {
         this.processError(e3);
         throw new Error("unreachable");
       }
     } else {
       const result = await this.actor.fetchGoogleDocText(arg0);
-      return from_candid_ExtractTextResult_n8(this._uploadFile, this._downloadFile, result);
+      return from_candid_ExtractTextResult_n11(this._uploadFile, this._downloadFile, result);
     }
   }
   async getCacheStats() {
@@ -28423,56 +28439,56 @@ class Backend {
     if (this.processError) {
       try {
         const result = await this.actor.getEvaluationById(arg0);
-        return from_candid_opt_n10(this._uploadFile, this._downloadFile, result);
+        return from_candid_opt_n13(this._uploadFile, this._downloadFile, result);
       } catch (e3) {
         this.processError(e3);
         throw new Error("unreachable");
       }
     } else {
       const result = await this.actor.getEvaluationById(arg0);
-      return from_candid_opt_n10(this._uploadFile, this._downloadFile, result);
+      return from_candid_opt_n13(this._uploadFile, this._downloadFile, result);
     }
   }
   async getExportHistory() {
     if (this.processError) {
       try {
         const result = await this.actor.getExportHistory();
-        return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+        return from_candid_vec_n14(this._uploadFile, this._downloadFile, result);
       } catch (e3) {
         this.processError(e3);
         throw new Error("unreachable");
       }
     } else {
       const result = await this.actor.getExportHistory();
-      return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+      return from_candid_vec_n14(this._uploadFile, this._downloadFile, result);
     }
   }
   async getHistory() {
     if (this.processError) {
       try {
         const result = await this.actor.getHistory();
-        return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+        return from_candid_vec_n14(this._uploadFile, this._downloadFile, result);
       } catch (e3) {
         this.processError(e3);
         throw new Error("unreachable");
       }
     } else {
       const result = await this.actor.getHistory();
-      return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+      return from_candid_vec_n14(this._uploadFile, this._downloadFile, result);
     }
   }
   async getHistoryByRepo(arg0) {
     if (this.processError) {
       try {
         const result = await this.actor.getHistoryByRepo(arg0);
-        return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+        return from_candid_vec_n14(this._uploadFile, this._downloadFile, result);
       } catch (e3) {
         this.processError(e3);
         throw new Error("unreachable");
       }
     } else {
       const result = await this.actor.getHistoryByRepo(arg0);
-      return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+      return from_candid_vec_n14(this._uploadFile, this._downloadFile, result);
     }
   }
   async getRoleStats() {
@@ -28521,22 +28537,25 @@ class Backend {
 function from_candid_Alignment_n5(_uploadFile, _downloadFile, value) {
   return from_candid_variant_n6(_uploadFile, _downloadFile, value);
 }
-function from_candid_EvaluationRecord_n12(_uploadFile, _downloadFile, value) {
-  return from_candid_record_n13(_uploadFile, _downloadFile, value);
+function from_candid_EvaluationRecord_n15(_uploadFile, _downloadFile, value) {
+  return from_candid_record_n16(_uploadFile, _downloadFile, value);
 }
 function from_candid_EvaluationResult_n3(_uploadFile, _downloadFile, value) {
   return from_candid_record_n4(_uploadFile, _downloadFile, value);
 }
-function from_candid_ExtractTextResult_n8(_uploadFile, _downloadFile, value) {
-  return from_candid_variant_n9(_uploadFile, _downloadFile, value);
+function from_candid_ExtractTextResult_n11(_uploadFile, _downloadFile, value) {
+  return from_candid_variant_n12(_uploadFile, _downloadFile, value);
 }
-function from_candid_opt_n10(_uploadFile, _downloadFile, value) {
+function from_candid_RecruiterVerdict_n8(_uploadFile, _downloadFile, value) {
+  return from_candid_record_n9(_uploadFile, _downloadFile, value);
+}
+function from_candid_opt_n13(_uploadFile, _downloadFile, value) {
   return value.length === 0 ? null : from_candid_EvaluationResult_n3(_uploadFile, _downloadFile, value[0]);
 }
 function from_candid_opt_n7(_uploadFile, _downloadFile, value) {
-  return value.length === 0 ? null : value[0];
+  return value.length === 0 ? null : from_candid_RecruiterVerdict_n8(_uploadFile, _downloadFile, value[0]);
 }
-function from_candid_record_n13(_uploadFile, _downloadFile, value) {
+function from_candid_record_n16(_uploadFile, _downloadFile, value) {
   return {
     id: value.id,
     result: from_candid_EvaluationResult_n3(_uploadFile, _downloadFile, value.result),
@@ -28549,6 +28568,7 @@ function from_candid_record_n13(_uploadFile, _downloadFile, value) {
 function from_candid_record_n4(_uploadFile, _downloadFile, value) {
   return {
     applied_instructions: value.applied_instructions,
+    strengths: value.strengths,
     scores: value.scores,
     summary: value.summary,
     missing_items: value.missing_items,
@@ -28558,13 +28578,24 @@ function from_candid_record_n4(_uploadFile, _downloadFile, value) {
     red_flags: value.red_flags,
     project_type: value.project_type,
     alignment: from_candid_Alignment_n5(_uploadFile, _downloadFile, value.alignment),
-    recruiter_verdict: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.recruiter_verdict))
+    recruiter_verdict: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.recruiter_verdict)),
+    criticalGaps: value.criticalGaps
   };
 }
-function from_candid_variant_n6(_uploadFile, _downloadFile, value) {
-  return "Low" in value ? "Low" : "High" in value ? "High" : "Medium" in value ? "Medium" : value;
+function from_candid_record_n9(_uploadFile, _downloadFile, value) {
+  return {
+    why: value.why,
+    strengths: value.strengths,
+    emoji: value.emoji,
+    verdict: from_candid_variant_n10(_uploadFile, _downloadFile, value.verdict),
+    technical_debt: value.technical_debt,
+    criticalGaps: value.criticalGaps
+  };
 }
-function from_candid_variant_n9(_uploadFile, _downloadFile, value) {
+function from_candid_variant_n10(_uploadFile, _downloadFile, value) {
+  return "fail" in value ? "fail" : "pass" in value ? "pass" : "caution" in value ? "caution" : value;
+}
+function from_candid_variant_n12(_uploadFile, _downloadFile, value) {
   return "ok" in value ? {
     __kind__: "ok",
     ok: value.ok
@@ -28573,8 +28604,11 @@ function from_candid_variant_n9(_uploadFile, _downloadFile, value) {
     err: value.err
   } : value;
 }
-function from_candid_vec_n11(_uploadFile, _downloadFile, value) {
-  return value.map((x3) => from_candid_EvaluationRecord_n12(_uploadFile, _downloadFile, x3));
+function from_candid_variant_n6(_uploadFile, _downloadFile, value) {
+  return "Low" in value ? "Low" : "High" in value ? "High" : "Medium" in value ? "Medium" : value;
+}
+function from_candid_vec_n14(_uploadFile, _downloadFile, value) {
+  return value.map((x3) => from_candid_EvaluationRecord_n15(_uploadFile, _downloadFile, x3));
 }
 function from_candid_vec_n2(_uploadFile, _downloadFile, value) {
   return value.map((x3) => from_candid_EvaluationResult_n3(_uploadFile, _downloadFile, x3));
@@ -29374,18 +29408,18 @@ function AlignmentBadge({ alignment }) {
   );
 }
 function scoreColor$1(score) {
-  if (score >= 7) return "text-[oklch(var(--chart-3))]";
-  if (score >= 4) return "text-[oklch(var(--chart-4))]";
+  if (score >= 70) return "text-[oklch(var(--chart-3))]";
+  if (score >= 40) return "text-[oklch(var(--chart-4))]";
   return "text-destructive";
 }
 function scoreBorder(score) {
-  if (score >= 7) return "border-[oklch(var(--chart-3)/0.3)]";
-  if (score >= 4) return "border-[oklch(var(--chart-4)/0.3)]";
+  if (score >= 70) return "border-[oklch(var(--chart-3)/0.3)]";
+  if (score >= 40) return "border-[oklch(var(--chart-4)/0.3)]";
   return "border-destructive/30";
 }
 function scoreBg(score) {
-  if (score >= 7) return "bg-[oklch(var(--chart-3)/0.05)]";
-  if (score >= 4) return "bg-[oklch(var(--chart-4)/0.05)]";
+  if (score >= 70) return "bg-[oklch(var(--chart-3)/0.05)]";
+  if (score >= 40) return "bg-[oklch(var(--chart-4)/0.05)]";
   return "bg-destructive/5";
 }
 function ScoreCard({
@@ -29415,7 +29449,7 @@ function ScoreCard({
             ].filter(Boolean).join(" "),
             children: [
               score,
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-muted-foreground font-normal text-sm", children: "/10" })
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-muted-foreground font-normal text-sm", children: "/100" })
             ]
           }
         ),
@@ -29434,39 +29468,51 @@ function formatTimestamp(ts) {
     timeStyle: "short"
   });
 }
+function verdictLabel(v2) {
+  const s2 = String(v2).toLowerCase();
+  if (s2 === "pass") return "PASS";
+  if (s2 === "caution") return "CAUTION";
+  return "FAIL";
+}
 function deriveVerdict$1(finalScore) {
-  if (finalScore > 8.5) {
+  if (finalScore >= 80) {
     return {
       emoji: "✅",
-      verdict: "Highly Recommended",
+      verdict: "pass",
       why: "This candidate demonstrates strong alignment with the assignment requirements and solid technical execution across all evaluated dimensions.",
-      technical_debt: "Production Ready"
+      technical_debt: "Production Ready",
+      strengths: [],
+      criticalGaps: []
     };
   }
-  if (finalScore >= 6) {
+  if (finalScore >= 60) {
     return {
       emoji: "⚠️",
-      verdict: "Proceed with Caution",
+      verdict: "caution",
       why: "The submission shows partial alignment with the assignment — key areas are covered but notable gaps remain that should be addressed in the interview.",
-      technical_debt: "Prototype Grade"
+      technical_debt: "Prototype Grade",
+      strengths: [],
+      criticalGaps: []
     };
   }
   return {
     emoji: "❌",
-    verdict: "Not Recommended",
+    verdict: "fail",
     why: "The submission does not adequately meet the assignment requirements. Significant work is missing and the overall quality falls below the threshold for this role.",
-    technical_debt: "Prototype Grade"
+    technical_debt: "Prototype Grade",
+    strengths: [],
+    criticalGaps: []
   };
 }
-function verdictColors(emoji) {
-  if (emoji === "✅") {
+function verdictColors(label) {
+  if (label === "PASS") {
     return {
       wrapper: "bg-[oklch(var(--chart-2)/0.08)] border-[oklch(var(--chart-2)/0.3)]",
       badge: "text-[oklch(var(--chart-2))]",
       debtPill: (debt) => debt === "Production Ready" ? "bg-[oklch(var(--chart-2)/0.15)] text-[oklch(var(--chart-2))] border-[oklch(var(--chart-2)/0.3)]" : "bg-muted text-muted-foreground border-border"
     };
   }
-  if (emoji === "⚠️") {
+  if (label === "CAUTION") {
     return {
       wrapper: "bg-[oklch(var(--chart-4)/0.08)] border-[oklch(var(--chart-4)/0.3)]",
       badge: "text-[oklch(var(--chart-4))]",
@@ -29482,24 +29528,24 @@ function verdictColors(emoji) {
 function buildRuleBasedSummary(result) {
   const final = toNum(result.final_score);
   const s2 = result.scores;
-  const line1 = final >= 8 ? "Strong submission with broad requirement coverage." : final >= 5 ? "Partial implementation — key areas partially covered." : "Misaligned or significantly incomplete submission.";
+  const line1 = final >= 80 ? "Strong submission with broad requirement coverage." : final >= 50 ? "Partial implementation — key areas partially covered." : "Misaligned or significantly incomplete submission.";
   const categories = [
     { label: "coverage", score: toNum(s2.coverage) },
     { label: "stack match", score: toNum(s2.stackMatch) },
     { label: "completeness", score: toNum(s2.completeness) },
     { label: "depth", score: toNum(s2.depth) },
     { label: "documentation", score: toNum(s2.docs) },
-    { label: "demo", score: toNum(s2.demo) },
+    { label: "demo", score: toNum(s2.demoReadiness) },
     { label: "AI usage", score: toNum(s2.aiUsage) }
   ];
   const sorted = [...categories].sort((a2, b2) => b2.score - a2.score);
   const strongest = sorted[0];
   const weakest = sorted[sorted.length - 1];
-  const line2 = `Strongest area: ${strongest.label} (${strongest.score}/10).`;
+  const line2 = `Strongest area: ${strongest.label} (${strongest.score}/100).`;
   const firstMissing = result.missing_items[0];
   const missingPart = firstMissing ? ` Missing: ${firstMissing.toLowerCase()}.` : "";
-  const line3 = `Weakest area: ${weakest.label} (${weakest.score}/10).${missingPart}`;
-  const line4 = result.red_flags.length > 0 ? `Top concern: ${result.red_flags[0]}` : final >= 8 ? "Recommend proceeding to next evaluation stage." : "Recommend requesting demo or clarification on weak areas.";
+  const line3 = `Weakest area: ${weakest.label} (${weakest.score}/100).${missingPart}`;
+  const line4 = result.red_flags.length > 0 ? `Top concern: ${result.red_flags[0]}` : final >= 80 ? "Recommend proceeding to next evaluation stage." : "Recommend requesting demo or clarification on weak areas.";
   return [line1, line2, line3, line4];
 }
 function getSummaryLines(result) {
@@ -29518,15 +29564,15 @@ function buildPlainText(result) {
     `Project Type: ${result.project_type}`,
     `Assignment Alignment: ${result.alignment}`,
     "",
-    `Coverage:     ${toNum(s2.coverage)}/10`,
-    `Stack Match:  ${toNum(s2.stackMatch)}/10`,
-    `Completeness: ${toNum(s2.completeness)}/10`,
-    `Depth:        ${toNum(s2.depth)}/10`,
-    `Docs:         ${toNum(s2.docs)}/10`,
-    `Demo:         ${toNum(s2.demo)}/10`,
-    `AI Usage:     ${toNum(s2.aiUsage)}/10`,
+    `Coverage:     ${toNum(s2.coverage)}/100`,
+    `Stack Match:  ${toNum(s2.stackMatch)}/100`,
+    `Completeness: ${toNum(s2.completeness)}/100`,
+    `Depth:        ${toNum(s2.depth)}/100`,
+    `Docs:         ${toNum(s2.docs)}/100`,
+    `Demo:         ${toNum(s2.demoReadiness)}/100`,
+    `AI Usage:     ${toNum(s2.aiUsage)}/100`,
     "",
-    `Final Score: ${toNum(result.final_score)}/10`,
+    `Final Score: ${toNum(result.final_score)}/100`,
     "",
     "Summary:",
     ...lines_summary,
@@ -29540,13 +29586,17 @@ function buildPlainText(result) {
   return lines.join("\n");
 }
 function ResultReport({ result }) {
+  var _a3, _b3;
   const [copied, setCopied] = reactExports.useState(false);
   const s2 = result.scores;
   const summaryLines = getSummaryLines(result);
   const finalScore = toNum(result.final_score);
   const verdict = result.recruiter_verdict ?? deriveVerdict$1(finalScore);
-  const colors = verdictColors(verdict.emoji);
+  const label = verdictLabel(verdict.verdict);
+  const colors = verdictColors(label);
   const appliedInstructions = result.applied_instructions ?? [];
+  const strengths = (((_a3 = verdict.strengths) == null ? void 0 : _a3.length) ? verdict.strengths : result.strengths) ?? [];
+  const criticalGaps = (((_b3 = verdict.criticalGaps) == null ? void 0 : _b3.length) ? verdict.criticalGaps : result.criticalGaps) ?? [];
   const scoreMetrics = [
     {
       label: "Coverage",
@@ -29565,7 +29615,7 @@ function ResultReport({ result }) {
     },
     { label: "Depth", score: toNum(s2.depth), ocid: "result.depth_card" },
     { label: "Docs", score: toNum(s2.docs), ocid: "result.docs_card" },
-    { label: "Demo", score: toNum(s2.demo), ocid: "result.demo_card" },
+    { label: "Demo", score: toNum(s2.demoReadiness), ocid: "result.demo_card" },
     {
       label: "AI Usage",
       score: toNum(s2.aiUsage),
@@ -29605,7 +29655,7 @@ function ResultReport({ result }) {
                       "font-display font-bold text-base leading-tight",
                       colors.badge
                     ].join(" "),
-                    children: verdict.verdict
+                    children: label
                   }
                 ),
                 /* @__PURE__ */ jsxRuntimeExports.jsx(AlignmentBadge, { alignment: result.alignment })
@@ -29627,11 +29677,50 @@ function ResultReport({ result }) {
                   "span",
                   {
                     "data-ocid": "result.prompt_log_badge",
-                    className: toNum(s2.aiUsage) > 0 ? "text-xs font-medium px-2.5 py-1 rounded-full border bg-[oklch(var(--chart-2)/0.1)] text-[oklch(var(--chart-2))] border-[oklch(var(--chart-2)/0.3)]" : "text-xs font-medium px-2.5 py-1 rounded-full border bg-muted/50 text-muted-foreground border-border",
-                    children: toNum(s2.aiUsage) > 0 ? "Prompt log: Present — evaluated as bonus" : "Prompt log: Not provided — no penalty"
+                    className: "text-xs font-medium px-2.5 py-1 rounded-full border bg-muted/50 text-muted-foreground border-border",
+                    children: appliedInstructions.some((instr) => /prompt.?log/i.test(instr)) ? `AI Usage: ${toNum(s2.aiUsage)}/100 · Prompt log evaluated` : `AI Usage: ${toNum(s2.aiUsage)}/100`
                   }
                 )
               ] }),
+              (strengths.length > 0 || criticalGaps.length > 0) && /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                "div",
+                {
+                  "data-ocid": "result.strengths_gaps",
+                  className: "grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-current/10",
+                  children: [
+                    strengths.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] uppercase tracking-widest font-mono text-[oklch(var(--chart-3))] font-semibold block mb-1.5", children: "Strengths" }),
+                      /* @__PURE__ */ jsxRuntimeExports.jsx("ul", { className: "flex flex-col gap-1", children: strengths.map((str, i) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                        "li",
+                        {
+                          "data-ocid": `result.strength.item.${i + 1}`,
+                          className: "text-xs text-[oklch(var(--chart-3))] flex items-start gap-1.5",
+                          children: [
+                            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "mt-1 w-1.5 h-1.5 rounded-full bg-[oklch(var(--chart-3))] flex-shrink-0" }),
+                            str
+                          ]
+                        },
+                        `strength-${str.slice(0, 24)}-${i}`
+                      )) })
+                    ] }),
+                    criticalGaps.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-[10px] uppercase tracking-widest font-mono text-destructive font-semibold block mb-1.5", children: "Critical Gaps" }),
+                      /* @__PURE__ */ jsxRuntimeExports.jsx("ul", { className: "flex flex-col gap-1", children: criticalGaps.map((gap, i) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                        "li",
+                        {
+                          "data-ocid": `result.critical_gap.item.${i + 1}`,
+                          className: "text-xs text-destructive flex items-start gap-1.5",
+                          children: [
+                            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "mt-0.5 flex-shrink-0", children: "⚠" }),
+                            gap
+                          ]
+                        },
+                        `gap-${gap.slice(0, 24)}-${i}`
+                      )) })
+                    ] })
+                  ]
+                }
+              ),
               appliedInstructions.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs(
                 "div",
                 {
@@ -29766,12 +29855,12 @@ function ResultReport({ result }) {
                     "data-ocid": "result.final_score_value",
                     className: [
                       "font-mono font-bold text-4xl leading-none",
-                      finalScore >= 7 ? "text-[oklch(var(--chart-3))]" : finalScore >= 4 ? "text-[oklch(var(--chart-4))]" : "text-destructive"
+                      finalScore >= 70 ? "text-[oklch(var(--chart-3))]" : finalScore >= 40 ? "text-[oklch(var(--chart-4))]" : "text-destructive"
                     ].join(" "),
                     children: finalScore
                   }
                 ),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-mono text-muted-foreground text-lg", children: "/10" })
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-mono text-muted-foreground text-lg", children: "/100" })
               ] })
             ]
           }
@@ -33224,7 +33313,7 @@ const FULL_HEADERS = [
   "completeness",
   "depth",
   "docs",
-  "demo",
+  "demoReadiness",
   "aiUsage",
   "summary_line1",
   "summary_line2",
@@ -33251,7 +33340,7 @@ function recordToRow(record) {
     String(Number(r2.scores.completeness)),
     String(Number(r2.scores.depth)),
     String(Number(r2.scores.docs)),
-    String(Number(r2.scores.demo)),
+    String(Number(r2.scores.demoReadiness)),
     String(Number(r2.scores.aiUsage)),
     lines[0] ?? "",
     lines[1] ?? "",
@@ -33328,7 +33417,7 @@ function generateCandidateBrief$1(record) {
   });
   const verdict = r2.recruiter_verdict ?? {
     emoji: finalScore > 8.5 ? "✅" : finalScore >= 6 ? "⚠️" : "❌",
-    verdict: finalScore > 8.5 ? "Highly Recommended" : finalScore >= 6 ? "Proceed with Caution" : "Not Recommended",
+    verdict: finalScore > 8.5 ? "pass" : finalScore >= 6 ? "caution" : "fail",
     why: finalScore > 8.5 ? "Strong alignment with requirements and solid technical execution across all evaluated dimensions." : finalScore >= 6 ? "Partial alignment — key areas are covered but notable gaps remain." : "Does not adequately meet the assignment requirements.",
     technical_debt: finalScore > 8.5 ? "Production Ready" : "Prototype Grade"
   };
@@ -33343,7 +33432,7 @@ function generateCandidateBrief$1(record) {
     { label: "Completeness", value: Number(r2.scores.completeness) },
     { label: "Depth", value: Number(r2.scores.depth) },
     { label: "Documentation", value: Number(r2.scores.docs) },
-    { label: "Demo", value: Number(r2.scores.demo) },
+    { label: "Demo", value: Number(r2.scores.demoReadiness) },
     { label: "AI Usage", value: Number(r2.scores.aiUsage) }
   ];
   const sorted = [...dimensions].sort((a2, b2) => b2.value - a2.value);
@@ -57644,12 +57733,12 @@ const METRIC_LABELS = {
   completeness: "Completeness",
   depth: "Depth",
   docs: "Documentation",
-  demo: "Demo",
+  demoReadiness: "Demo",
   aiUsage: "AI Usage"
 };
 function useDashboard(filteredRecords, allRecords) {
   const kpis = reactExports.useMemo(() => {
-    var _a3;
+    var _a3, _b3;
     const total = filteredRecords.length;
     if (total === 0) {
       return {
@@ -57671,12 +57760,14 @@ function useDashboard(filteredRecords, allRecords) {
     for (const r2 of filteredRecords) {
       const s2 = Number(r2.result.final_score);
       sum += s2;
-      if (s2 >= 8.5) pass++;
-      else if (s2 >= 6) caution++;
+      const vRaw = (_a3 = r2.result.recruiter_verdict) == null ? void 0 : _a3.verdict;
+      const v2 = vRaw ? String(vRaw).toLowerCase() : null;
+      if (v2 === "pass" || !v2 && s2 >= 80) pass++;
+      else if (v2 === "caution" || !v2 && s2 >= 60) caution++;
       else fail++;
       if (s2 > topScore) {
         topScore = s2;
-        topOwner = ((_a3 = r2.owner) == null ? void 0 : _a3.trim()) || "—";
+        topOwner = ((_b3 = r2.owner) == null ? void 0 : _b3.trim()) || "—";
       }
     }
     return {
@@ -57717,26 +57808,27 @@ function useDashboard(filteredRecords, allRecords) {
     }).sort((a2, b2) => a2.rawMs - b2.rawMs);
   }, [filteredRecords]);
   const verdictData = reactExports.useMemo(() => {
+    var _a3;
     let pass = 0;
     let caution = 0;
     let fail = 0;
     for (const r2 of filteredRecords) {
       const s2 = Number(r2.result.final_score);
-      if (s2 >= 8.5) pass++;
-      else if (s2 >= 6) caution++;
+      const vRaw = (_a3 = r2.result.recruiter_verdict) == null ? void 0 : _a3.verdict;
+      const v2 = vRaw ? String(vRaw).toLowerCase() : null;
+      if (v2 === "pass" || !v2 && s2 >= 80) pass++;
+      else if (v2 === "caution" || !v2 && s2 >= 60) caution++;
       else fail++;
     }
     const out = [];
-    if (pass > 0)
-      out.push({ name: "Highly Recommended", value: pass, key: "pass" });
+    if (pass > 0) out.push({ name: "PASS", value: pass, key: "pass" });
     if (caution > 0)
       out.push({
-        name: "Proceed with Caution",
+        name: "CAUTION",
         value: caution,
         key: "caution"
       });
-    if (fail > 0)
-      out.push({ name: "Not Recommended", value: fail, key: "fail" });
+    if (fail > 0) out.push({ name: "FAIL", value: fail, key: "fail" });
     return out;
   }, [filteredRecords]);
   const metricBreakdown = reactExports.useMemo(() => {
@@ -57759,8 +57851,8 @@ function useDashboard(filteredRecords, allRecords) {
   return { kpis, roleBarData, trendData, verdictData, metricBreakdown };
 }
 function scoreColor(score) {
-  if (score >= 8.5) return CHART_COLORS.green;
-  if (score >= 6) return CHART_COLORS.yellow;
+  if (score >= 70) return CHART_COLORS.green;
+  if (score >= 40) return CHART_COLORS.yellow;
   return CHART_COLORS.red;
 }
 const CHART_COLORS = {
@@ -57779,8 +57871,8 @@ const PLACEHOLDER_BAR_COLOR = "#c7d2fe";
 const PLACEHOLDER_LINE_COLOR = "#a5b4fc";
 const PLACEHOLDER_DONUT_COLORS = ["#c7d2fe", "#ddd6fe", "#e9d5ff"];
 function scoreBadgeClasses(score) {
-  if (score >= 8.5) return "text-[#4ade80] bg-[#4ade80]/10 border-[#4ade80]/30";
-  if (score >= 6) return "text-[#facc15] bg-[#facc15]/10 border-[#facc15]/30";
+  if (score >= 70) return "text-[#4ade80] bg-[#4ade80]/10 border-[#4ade80]/30";
+  if (score >= 40) return "text-[#facc15] bg-[#facc15]/10 border-[#facc15]/30";
   return "text-[#f87171] bg-[#f87171]/10 border-[#f87171]/30";
 }
 function ScoreBadge({ score }) {
@@ -57792,20 +57884,28 @@ function ScoreBadge({ score }) {
         scoreBadgeClasses(score)
       ].join(" "),
       children: [
-        score.toFixed(1),
-        "/10"
+        Math.round(score),
+        "/100"
       ]
     }
   );
 }
 function deriveVerdict(score) {
-  if (score >= 8.5) return { verdict: "Highly Recommended", emoji: "✅" };
-  if (score >= 6) return { verdict: "Proceed with Caution", emoji: "⚠️" };
-  return { verdict: "Not Recommended", emoji: "❌" };
+  if (score >= 80) return { verdict: "PASS", emoji: "✅" };
+  if (score >= 60) return { verdict: "CAUTION", emoji: "⚠️" };
+  return { verdict: "FAIL", emoji: "❌" };
 }
 function VerdictBadge({ record }) {
+  var _a3;
   const score = Number(record.result.final_score);
-  const { emoji, verdict } = deriveVerdict(score);
+  const backendVerdict = (_a3 = record.result.recruiter_verdict) == null ? void 0 : _a3.verdict;
+  const verdictDisplayMap = {
+    pass: { emoji: "✅", verdict: "PASS" },
+    caution: { emoji: "⚠️", verdict: "CAUTION" },
+    fail: { emoji: "❌", verdict: "FAIL" }
+  };
+  const displayed = backendVerdict ? verdictDisplayMap[String(backendVerdict)] ?? deriveVerdict(score) : deriveVerdict(score);
+  const { emoji, verdict } = displayed;
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded bg-muted/50 border border-border text-foreground font-medium shrink-0", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx("span", { "aria-hidden": "true", children: emoji }),
     /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "hidden sm:inline truncate max-w-[110px]", children: verdict })
@@ -57826,7 +57926,7 @@ function generateCandidateBrief(record) {
   const summaryLines = record.result.summary ? record.result.summary.split("\n").map((l2) => l2.trim()).filter(Boolean) : [];
   const missingItems = record.result.missing_items ?? [];
   const redFlags = record.result.red_flags ?? [];
-  const debtLabel = score >= 8.5 ? "Production Ready" : score >= 6 ? "Needs Polish" : "Prototype Grade";
+  const debtLabel = score >= 80 ? "Production Ready" : score >= 60 ? "Needs Polish" : "Prototype Grade";
   const html = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"/>
 <title>Candidate Brief — @${record.owner || "Unknown"}</title>
@@ -57834,7 +57934,7 @@ function generateCandidateBrief(record) {
 </head>
 <body><div class="card">
 <div class="header"><div><div class="title">@${record.owner || "Unknown"}</div><div class="subtitle">${record.repo_url}</div><div style="margin-top:.4rem;font-size:.78rem;color:#64748b">Role: <strong>${role}</strong> &nbsp;·&nbsp; Evaluated: <strong>${date2}</strong></div></div>
-<div class="score-badge ${score >= 8.5 ? "score-green" : score >= 6 ? "score-yellow" : "score-red"}">${score.toFixed(1)}<span style="font-size:.9rem;font-weight:400">/10</span></div></div>
+<div class="score-badge ${score >= 80 ? "score-green" : score >= 60 ? "score-yellow" : "score-red"}">${score.toFixed(1)}<span style="font-size:.9rem;font-weight:400">/100</span></div></div>
 <div class="verdict"><div class="verdict-title">Recruiter's Verdict</div><div class="verdict-value">${emoji} ${verdict}</div><div style="margin-top:.4rem;font-size:.78rem;color:#64748b">${debtLabel}</div></div>
 <div class="section summary"><div class="section-title">Summary</div>${summaryLines.map((l2) => `<p>${l2}</p>`).join("")}</div>
 <div class="section"><div class="section-title">Score Breakdown</div><div class="scores-grid">
@@ -57843,7 +57943,7 @@ function generateCandidateBrief(record) {
 <div class="score-cell"><div class="label">Complete</div><div class="value">${fmt(scores.completeness)}</div></div>
 <div class="score-cell"><div class="label">Depth</div><div class="value">${fmt(scores.depth)}</div></div>
 <div class="score-cell"><div class="label">Docs</div><div class="value">${fmt(scores.docs)}</div></div>
-<div class="score-cell"><div class="label">Demo</div><div class="value">${fmt(scores.demo)}</div></div>
+<div class="score-cell"><div class="label">Demo</div><div class="value">${fmt(scores.demoReadiness)}</div></div>
 <div class="score-cell"><div class="label">AI Usage</div><div class="value">${fmt(scores.aiUsage)}</div></div>
 <div class="score-cell"><div class="label">Alignment</div><div class="value" style="font-size:.75rem">${record.result.alignment}</div></div>
 </div></div>
@@ -58007,7 +58107,7 @@ function RoleBarChart({
           /* @__PURE__ */ jsxRuntimeExports.jsx(
             YAxis,
             {
-              domain: [0, 10],
+              domain: [0, 100],
               tick: { fontSize: 10, fill: "#94a3b8" },
               axisLine: false,
               tickLine: false,
@@ -58089,7 +58189,7 @@ function TrendLineChart({
           /* @__PURE__ */ jsxRuntimeExports.jsx(
             YAxis,
             {
-              domain: [0, 10],
+              domain: [0, 100],
               tick: { fontSize: 10, fill: "#94a3b8" },
               axisLine: false,
               tickLine: false,
@@ -58260,7 +58360,7 @@ function MetricBarBreakdown({
         {
           className: "h-full rounded-full transition-all duration-500",
           style: {
-            width: hasData ? `${item.avg / 10 * 100}%` : "6%",
+            width: hasData ? `${item.avg}%` : "6%",
             backgroundColor: hasData ? scoreColor(item.avg) : PLACEHOLDER_BAR_COLOR,
             opacity: hasData ? 1 : 0.7
           }
@@ -58453,9 +58553,9 @@ function DashboardSection({
               ocid: "dashboard.kpi.avg_score",
               label: "Avg Final Score",
               value: kpis.total > 0 ? kpis.avgScore.toFixed(1) : "—",
-              sub: noData ? void 0 : "Out of 10 — higher is better",
+              sub: noData ? void 0 : "Out of 100 — higher is better",
               isEmpty: noData,
-              emptyHint: "Average score out of 10 across all evals",
+              emptyHint: "Average score out of 100 across all evals",
               icon: /* @__PURE__ */ jsxRuntimeExports.jsx(ChartNoAxesColumn, { className: "w-4 h-4" }),
               accentColor: CHART_COLORS.blue
             }
@@ -58466,9 +58566,9 @@ function DashboardSection({
               ocid: "dashboard.kpi.pass_rate",
               label: "Pass Rate",
               value: kpis.total > 0 ? `${kpis.passRate}%` : "—",
-              sub: noData ? void 0 : "Score ≥ 8.5",
+              sub: noData ? void 0 : "Score ≥ 80",
               isEmpty: noData,
-              emptyHint: "% of candidates scoring ≥ 8.5 (Hire)",
+              emptyHint: "% of candidates scoring ≥ 80 (Hire)",
               icon: /* @__PURE__ */ jsxRuntimeExports.jsx(CircleCheck, { className: "w-4 h-4" }),
               accentColor: CHART_COLORS.green
             }
@@ -58479,9 +58579,9 @@ function DashboardSection({
               ocid: "dashboard.kpi.caution_rate",
               label: "Caution Rate",
               value: kpis.total > 0 ? `${kpis.cautionRate}%` : "—",
-              sub: noData ? void 0 : "Score 6–8.4",
+              sub: noData ? void 0 : "Score 60-79",
               isEmpty: noData,
-              emptyHint: "% of candidates in the 6–8.4 range",
+              emptyHint: "% of candidates in the 60–79 range",
               icon: /* @__PURE__ */ jsxRuntimeExports.jsx(TriangleAlert, { className: "w-4 h-4" }),
               accentColor: CHART_COLORS.yellow
             }
@@ -58491,7 +58591,7 @@ function DashboardSection({
             {
               ocid: "dashboard.kpi.top_score",
               label: "Top Score",
-              value: kpis.total > 0 ? `${kpis.topScore}/10` : "—",
+              value: kpis.total > 0 ? `${kpis.topScore}/100` : "—",
               sub: noData ? void 0 : kpis.total > 0 ? `@${kpis.topOwner}` : "No evaluations yet",
               isEmpty: noData,
               emptyHint: "Highest scoring candidate's result",
@@ -58504,7 +58604,7 @@ function DashboardSection({
           /* @__PURE__ */ jsxRuntimeExports.jsx(CircleX, { className: "w-4 h-4 text-destructive shrink-0" }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-xs text-destructive font-medium", children: [
             kpis.failRate,
-            "% Not Recommended — scores below 6.0"
+            "% Not Recommended — scores below 60"
           ] })
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 lg:grid-cols-2 gap-4", children: [
@@ -58512,7 +58612,7 @@ function DashboardSection({
             ChartCard,
             {
               title: "Average Score by Role",
-              subtitle: noData ? "Will show bars for each role you evaluate" : "Color-coded: green ≥8.5 · yellow ≥6 · red <6",
+              subtitle: noData ? "Will show bars for each role you evaluate" : "Color-coded: green ≥70 · yellow ≥40 · red <40",
               ocid: "dashboard.chart.role_bar",
               children: /* @__PURE__ */ jsxRuntimeExports.jsx(RoleBarChart, { data: roleBarData })
             }

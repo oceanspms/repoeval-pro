@@ -215,7 +215,7 @@ mixin (
       case (?n) "\n\nAdditional context and notes:\n" # n;
     };
     let combinedText = assignmentText # notesSection;
-    let prompt = "You are an assignment classifier. Given the following hiring assignment, respond with ONLY a JSON object (no markdown, no explanation) in this exact format:\n{\"role\":\"<DevOps|Fullstack|Backend|Frontend>\",\"required_items\":[\"item1\",\"item2\",...]}\n\nAssignment:\n" # combinedText;
+    let prompt = "You are a hiring assignment classifier. Given the following hiring assignment, respond with ONLY a JSON object (no markdown, no explanation) in this exact format:\n{\"role\":\"<Frontend|Backend|Fullstack|DevOps|QA|ML|Mobile>\",\"required_items\":[\"item1\",\"item2\",...],\"core_items\":[\"item1\",...],\"secondary_items\":[\"item1\",...]}\n\nCRITICAL role detection rules:\n- If the assignment mentions React, Vue, Angular, HTML, CSS, UI, UX, components, Tailwind, styled-components, Next.js, Gatsby, Svelte, responsive design, web design, frontend, or front-end WITHOUT backend-specific terms (Express, Django, FastAPI, Node server, REST API, database, PostgreSQL, MongoDB, microservices, GraphQL server), classify as Frontend.\n- If it mentions both frontend AND backend technologies, classify as Fullstack.\n- If it mentions DevOps tools (Docker, Kubernetes, Terraform, CI/CD, pipelines, AWS, GCP, Azure) primarily, classify as DevOps.\n- If it is backend-only (APIs, databases, server logic, no UI), classify as Backend.\n- Reply with exactly one of: Frontend, Backend, Fullstack, DevOps, QA, ML, Mobile\n\nFor each requirement, classify as core (must-have, fundamental to the assignment) or secondary (optional, nice-to-have). All items must also appear in required_items. Return: {role, required_items, core_items, secondary_items}\n\nAssignment:\n" # combinedText;
 
     let body = "{\"model\":\"gpt-4o-mini\",\"temperature\":0,\"messages\":[{\"role\":\"user\",\"content\":" # jsonString(prompt) # "}]}";
 
@@ -246,7 +246,8 @@ mixin (
   };
 
   /// Parse AI response JSON into ParsedAssignment.
-  /// Falls back to a heuristic role + empty items on parse failure.
+  /// Falls back to heuristic extraction from the raw assignment text when the AI
+  /// response is empty, malformed, or returns no items.
   func parseParsedAssignment(json : Text, assignmentText : Text) : Types.ParsedAssignment {
     let role : Text = switch (extractJsonStringField(json, "role")) {
       case (?r) {
@@ -255,24 +256,169 @@ mixin (
         else if (rl.contains(#text "fullstack") or rl.contains(#text "full")) "Fullstack"
         else if (rl.contains(#text "backend"))   "Backend"
         else if (rl.contains(#text "frontend"))  "Frontend"
+        else if (rl.contains(#text "mobile"))    "Mobile"
+        else if (rl.contains(#text "qa"))        "QA"
+        else if (rl.contains(#text "ml") or rl.contains(#text "machine learning")) "ML"
         else r;
       };
       case null {
+        // Heuristic fallback — check assignment text for keywords
         let al = assignmentText.toLower();
-        if      (al.contains(#text "devops") or al.contains(#text "terraform") or al.contains(#text "kubernetes")) "DevOps"
-        else if (al.contains(#text "fullstack") or al.contains(#text "full-stack")) "Fullstack"
-        else if (al.contains(#text "backend")  or al.contains(#text "api")) "Backend"
-        else if (al.contains(#text "frontend") or al.contains(#text "react")) "Frontend"
-        else "General";
+        // Priority 1: explicit role labels
+        if (al.contains(#text "devops") or al.contains(#text "terraform") or
+            al.contains(#text "kubernetes") or
+            (al.contains(#text "ci/cd") and al.contains(#text "deploy"))) {
+          "DevOps"
+        } else if (al.contains(#text "fullstack") or al.contains(#text "full-stack") or al.contains(#text "full stack")) {
+          "Fullstack"
+        } else if (al.contains(#text "mobile") or al.contains(#text "react native") or al.contains(#text "flutter")) {
+          "Mobile"
+        } else if (al.contains(#text "machine learning") or al.contains(#text " ml ") or al.contains(#text "deep learning") or al.contains(#text "nlp") or al.contains(#text "data science")) {
+          "ML"
+        } else {
+          // Priority 2: detect frontend vs backend via technology keywords
+          // Frontend keywords (UI/visual/component layer)
+          let hasFrontend : Bool =
+            al.contains(#text "react") or al.contains(#text "vue") or al.contains(#text "angular") or
+            al.contains(#text "svelte") or al.contains(#text "next.js") or al.contains(#text "gatsby") or
+            al.contains(#text "tailwind") or al.contains(#text "styled-component") or
+            al.contains(#text "html/css") or al.contains(#text "html and css") or
+            al.contains(#text "ui/ux") or al.contains(#text " ux ") or al.contains(#text "component") or
+            al.contains(#text "responsive") or al.contains(#text "web design") or
+            al.contains(#text "frontend") or al.contains(#text "front-end") or al.contains(#text "front end") or
+            al.contains(#text "landing page") or al.contains(#text "dashboard ui") or
+            al.contains(#text "user interface") or al.contains(#text "user experience") or
+            al.contains(#text "pixel") or al.contains(#text "design system") or
+            al.contains(#text "animation") or al.contains(#text "figma") or
+            // standalone CSS/HTML signal — only if no strong backend present
+            (al.contains(#text "css") and not al.contains(#text "express") and not al.contains(#text "server")) or
+            (al.contains(#text " ui ") and not al.contains(#text "express") and not al.contains(#text "backend"));
+          // Backend keywords (server/data/API layer)
+          // NOTE: bare "api" alone is NOT enough to classify as backend — many frontend
+          // assignments call third-party APIs. Need server/database context.
+          let hasBackend : Bool =
+            al.contains(#text "express") or al.contains(#text "django") or al.contains(#text "fastapi") or
+            al.contains(#text "flask") or al.contains(#text "spring boot") or al.contains(#text "rails") or
+            al.contains(#text "laravel") or al.contains(#text "graphql server") or
+            al.contains(#text "rest api server") or al.contains(#text "build an api") or
+            al.contains(#text "build a rest") or al.contains(#text "build rest") or
+            al.contains(#text "node.js server") or al.contains(#text "nodejs server") or
+            al.contains(#text "postgresql") or al.contains(#text "mongodb") or al.contains(#text "microservice") or
+            (al.contains(#text "api") and al.contains(#text "server") and not hasFrontend) or
+            (al.contains(#text "api") and al.contains(#text "database") and not hasFrontend) or
+            (al.contains(#text "backend") and not al.contains(#text "frontend")) or
+            al.contains(#text "back-end");
+          if (hasFrontend and hasBackend) "Fullstack"
+          else if (hasFrontend) "Frontend"
+          else if (hasBackend) "Backend"
+          else if (al.contains(#text "backend") or (al.contains(#text "api") and al.contains(#text "endpoint"))) "Backend"
+          else "General";
+        };
       };
     };
 
-    let items : [Text] = switch (extractJsonArray(json, "required_items")) {
-      case (?arr) arr;
-      case null   [];
+    let aiItems : ?[Text] = extractJsonArray(json, "required_items");
+    let aiCore  : ?[Text] = extractJsonArray(json, "core_items");
+    let aiSecondary : ?[Text] = extractJsonArray(json, "secondary_items");
+
+    // If the AI returned non-empty items, use them directly.
+    switch aiItems {
+      case (?items) {
+        if (items.size() > 0) {
+          let coreItems = switch aiCore {
+            case (?c) if (c.size() > 0) c else items;
+            case null items;
+          };
+          let secondaryItems = switch aiSecondary {
+            case (?s) s;
+            case null [];
+          };
+          return { role; required_items = items; core_items = coreItems; secondary_items = secondaryItems };
+        };
+      };
+      case null {};
     };
 
-    { role; required_items = items };
+    // ── Heuristic fallback ────────────────────────────────────────────────────
+    // AI response was empty, malformed, or returned no items.
+    // Extract requirements from the raw assignment text.
+    let heuristicItems = extractRequirementsHeuristic(assignmentText);
+
+    // Classify heuristic items as core or secondary by simple heuristics:
+    // Items with strong imperative verbs or "must" / "required" → core
+    // Items with "optional", "bonus", "nice to have" → secondary
+    let coreH = heuristicItems.filter(func(item) {
+      let il = item.toLower();
+      not (il.contains(#text "optional") or il.contains(#text "bonus") or
+           il.contains(#text "nice to have") or il.contains(#text "if time") or
+           il.contains(#text "extra"))
+    });
+    let secH = heuristicItems.filter(func(item) {
+      let il = item.toLower();
+      il.contains(#text "optional") or il.contains(#text "bonus") or
+      il.contains(#text "nice to have") or il.contains(#text "if time") or
+      il.contains(#text "extra")
+    });
+
+    { role; required_items = heuristicItems; core_items = coreH; secondary_items = secH };
+  };
+
+  /// Heuristic requirement extractor.
+  /// Splits assignment text on newlines / bullet points / numbered lists
+  /// to produce a list of non-empty requirement phrases.
+  func extractRequirementsHeuristic(text : Text) : [Text] {
+    // Normalise line endings
+    let normalized = text.replace(#char '\r', "");
+    let lines = normalized.split(#char '\n').toArray();
+    let items = lines.filterMap(func(line) : ?Text {
+      // Strip leading whitespace
+      let trimmed = line.trim(#char ' ');
+      // Strip common bullet/list prefixes: "- ", "* ", "• ", "1. ", "1) "
+      let stripped = stripListPrefix(trimmed);
+      let s = stripped.trim(#char ' ');
+      // Skip empty lines, pure headers (##), short fragments, and lines that
+      // are just punctuation.
+      if (s.size() < 10) null
+      else if (s.startsWith(#text "#")) null   // markdown header
+      else if (s.startsWith(#text "==")) null  // setext header
+      else if (s.startsWith(#text "---")) null // hr
+      else if (s.startsWith(#text "**") and s.endsWith(#text "**") and s.size() < 40) null // bold-only label
+      else ?s
+    });
+    // Deduplicate while preserving order
+    var seen : [Text] = [];
+    let deduped = items.filter(func(item) {
+      if (seen.any(func(s) { s == item })) false
+      else { seen := seen.concat([item]); true }
+    });
+    // Cap at 30 items to prevent runaway lists
+    deduped.sliceToArray(0, Nat.min(30, deduped.size()));
+  };
+
+  /// Strip common list prefixes from a line.
+  func stripListPrefix(line : Text) : Text {
+    // "- ", "* ", "+ ", "• "
+    for (prefix in ["- ", "* ", "+ ", "• ", "· "].values()) {
+      if (line.startsWith(#text prefix)) {
+        switch (line.stripStart(#text prefix)) {
+          case (?s) return s;
+          case null {};
+        };
+      };
+    };
+    // Numbered list: "1. ", "10. ", "1) ", "10) "
+    let chars = line.toArray();
+    var i : Nat = 0;
+    // consume leading digits
+    while (i < chars.size() and chars[i] >= '0' and chars[i] <= '9') { i += 1 };
+    if (i > 0 and i < chars.size()) {
+      // must be followed by '. ' or ') '
+      if ((chars[i] == '.' or chars[i] == ')') and i + 1 < chars.size() and chars[i + 1] == ' ') {
+        let rest = Array.tabulate(chars.size() - i - 2, func(idx : Nat) : Char { chars[i + 2 + idx] });
+        return Text.fromArray(rest);
+      };
+    };
+    line;
   };
 
   /// Extract a JSON string field value by key.
@@ -336,6 +482,88 @@ mixin (
     };
   };
 
+  // ── internal: deep source-file crawling ────────────────────────────────
+
+  /// Fetch the raw content of a single source file from GitHub.
+  /// Returns "" on error or non-200 response.
+  func fetchSourceFile(owner : Text, repo : Text, path : Text) : async Text {
+    let url = "https://raw.githubusercontent.com/" # owner # "/" # repo # "/HEAD/" # path;
+    try {
+      await OutCall.httpGetRequest(url, [
+        { name = "User-Agent"; value = "RepoEval-Pro/1.0" }
+      ], transform);
+    } catch _ { "" };
+  };
+
+  /// Return the first maxChars characters of content (caps at 6000).
+  func truncateContent(content : Text, maxChars : Nat) : Text {
+    let cap : Nat = if (maxChars > 6000) 6000 else maxChars;
+    if (content.size() <= cap) return content;
+    let chars = content.toArray();
+    let kept = Array.tabulate(cap, func(idx : Nat) : Char { chars[idx] });
+    Text.fromArray(kept);
+  };
+
+  /// Crawl up to 8 priority source files from the repo and enrich baseSignals
+  /// with framework detection, TODO counts, test counts, multi-stage Docker,
+  /// script presence, fetched file paths, and per-file summaries.
+  func enrichSignalsFromSourceFiles(
+    owner       : Text,
+    repo        : Text,
+    baseSignals : Types.RepoSignals,
+  ) : async Types.RepoSignals {
+    let priorityPaths = Repo.selectFilesToFetch(baseSignals.file_tree);
+
+    var detectedFrameworks : [Text] = [];
+    var todoCountSource : Nat = 0;
+    var testCount : Nat = 0;
+    var hasDockerfileMultistage : Bool = false;
+    var hasScripts : Bool = false;
+    var fetchedFilePaths : [Text] = [];
+    var keyFileSummaries : [(Text, Text)] = [];
+
+    for (filePath in priorityPaths.values()) {
+      let raw = await fetchSourceFile(owner, repo, filePath);
+      if (raw.size() > 0) {
+        let content = truncateContent(raw, 6000);
+        fetchedFilePaths := fetchedFilePaths.concat([filePath]);
+        keyFileSummaries := keyFileSummaries.concat([(filePath, Repo.buildFileSummary(filePath, content))]);
+
+        // package.json — extract frameworks and scripts
+        let fpLower = filePath.toLower();
+        if (fpLower == "package.json" or fpLower.endsWith(#text "/package.json")) {
+          let frameworks = Repo.parseFrameworks(content);
+          detectedFrameworks := detectedFrameworks.concat(frameworks);
+          if (not hasScripts) {
+            hasScripts := Repo.hasStartScripts(content);
+          };
+        };
+
+        // Dockerfile — check for multi-stage
+        if (fpLower == "dockerfile" or fpLower.endsWith(#text "/dockerfile")) {
+          if (not hasDockerfileMultistage) {
+            hasDockerfileMultistage := Repo.isMultistageDockerfile(content);
+          };
+        };
+
+        // Accumulate TODO and test counts from all source files
+        todoCountSource += Repo.countTodosInSource(content);
+        testCount += Repo.countTests(content);
+      };
+    };
+
+    {
+      baseSignals with
+      detected_frameworks       = detectedFrameworks;
+      todo_count_source         = todoCountSource;
+      test_count                = testCount;
+      has_dockerfile_multistage = hasDockerfileMultistage;
+      has_scripts               = hasScripts;
+      fetched_file_paths        = fetchedFilePaths;
+      key_file_summaries        = keyFileSummaries;
+    };
+  };
+
   // ── internal: single-repo evaluation ─────────────────────────────────────
 
   /// Evaluate a single GitHub repo against a parsed assignment.
@@ -379,7 +607,37 @@ mixin (
     };
 
     // Extract signals from enriched readme + file tree (notes already merged into readme)
-    let signals = Repo.extractSignals(enrichedReadme, filePaths);
+    let rawSignals = Repo.extractSignals(enrichedReadme, filePaths);
+
+    // Deep source-file crawl — enriches signals with framework detection, TODO counts,
+    // test counts, multi-stage Docker, scripts, and per-file summaries.
+    let baseSignals = if (repoOwner.size() > 0 and repoName.size() > 0) {
+      await enrichSignalsFromSourceFiles(repoOwner, repoName, rawSignals);
+    } else {
+      rawSignals;
+    };
+
+    // Demo link HTTP verification — attempt HEAD request to the extracted demo URL
+    // This prevents broken/dead links from scoring as a working demo
+    let signals : Types.RepoSignals = if (baseSignals.has_demo_link) {
+      let demoVerified : Bool = switch (baseSignals.demo_url) {
+        case null false; // has_demo_link was set via keyword but no URL extracted
+        case (?dUrl) {
+          try {
+            let response = await OutCall.httpGetRequest(dUrl, [
+              { name = "User-Agent"; value = "RepoEval-Pro/1.0" }
+            ], transform);
+            // A successful HTTP request returns non-empty body; error paths return ""
+            response.size() > 0;
+          } catch _ {
+            false; // timeout or network error → not verified
+          };
+        };
+      };
+      { baseSignals with has_working_demo_link = demoVerified };
+    } else {
+      baseSignals;
+    };
 
     // Also extract signals from notes text independently and merge (union) with repo signals.
     // This ensures that if notes mention "Redis", "Docker", "deployed to Vercel" etc.
@@ -387,20 +645,36 @@ mixin (
     let mergedSignals : Types.RepoSignals = if (notesText.size() > 0) {
       let notesSignals = Repo.extractSignals(notesText, []);
       {
-        readme_text       = signals.readme_text;          // keep original readme
-        file_tree         = signals.file_tree;            // file tree unchanged
-        has_dockerfile    = signals.has_dockerfile    or notesSignals.has_dockerfile;
-        has_compose       = signals.has_compose       or notesSignals.has_compose;
-        has_ci            = signals.has_ci            or notesSignals.has_ci;
-        has_terraform     = signals.has_terraform     or notesSignals.has_terraform;
-        has_backend       = signals.has_backend       or notesSignals.has_backend;
-        has_frontend      = signals.has_frontend      or notesSignals.has_frontend;
-        has_auth          = signals.has_auth          or notesSignals.has_auth;
-        has_db_config     = signals.has_db_config     or notesSignals.has_db_config;
-        has_api_routes    = signals.has_api_routes    or notesSignals.has_api_routes;
-        has_demo_link     = signals.has_demo_link     or notesSignals.has_demo_link;
-        has_ai_log        = signals.has_ai_log        or notesSignals.has_ai_log;
-        readme_word_count = signals.readme_word_count;    // keep original readme word count
+        readme_text         = signals.readme_text;          // keep original readme
+        file_tree           = signals.file_tree;            // file tree unchanged
+        has_dockerfile      = signals.has_dockerfile    or notesSignals.has_dockerfile;
+        has_compose         = signals.has_compose       or notesSignals.has_compose;
+        has_ci              = signals.has_ci            or notesSignals.has_ci;
+        has_terraform       = signals.has_terraform     or notesSignals.has_terraform;
+        has_backend         = signals.has_backend       or notesSignals.has_backend;
+        has_frontend        = signals.has_frontend      or notesSignals.has_frontend;
+        has_auth            = signals.has_auth          or notesSignals.has_auth;
+        has_db_config       = signals.has_db_config     or notesSignals.has_db_config;
+        has_api_routes      = signals.has_api_routes    or notesSignals.has_api_routes;
+        has_demo_link           = signals.has_demo_link           or notesSignals.has_demo_link;
+        has_working_demo_link   = signals.has_working_demo_link;  // HTTP verification applies to repo README only
+        demo_url                = signals.demo_url;                // keep repo's extracted URL
+        has_ai_log              = signals.has_ai_log              or notesSignals.has_ai_log;
+        readme_word_count   = signals.readme_word_count;    // keep original readme word count
+        todo_count          = signals.todo_count;           // keep repo value (not from notes)
+        has_env_example     = signals.has_env_example   or notesSignals.has_env_example;
+        has_seed_data       = signals.has_seed_data     or notesSignals.has_seed_data;
+        has_setup_script    = signals.has_setup_script  or notesSignals.has_setup_script;
+        error_handler_count = signals.error_handler_count; // keep repo value
+        file_count          = signals.file_count;           // keep repo file count
+        // Deep source-crawl fields — from crawled signals, not notes
+        detected_frameworks       = signals.detected_frameworks;
+        todo_count_source         = signals.todo_count_source;
+        test_count                = signals.test_count;
+        has_dockerfile_multistage = signals.has_dockerfile_multistage;
+        has_scripts               = signals.has_scripts;
+        fetched_file_paths        = signals.fetched_file_paths;
+        key_file_summaries        = signals.key_file_summaries;
       }
     } else {
       signals
@@ -410,25 +684,47 @@ mixin (
     let (matched, missing) = Scoring.matchRequirements(parsed, mergedSignals);
     let total = parsed.required_items.size();
 
+    // Count missing core and secondary items for severity-based coverage deduction
+    let coreMissing : Nat = missing.filter(func(item) {
+      parsed.core_items.any(func(ci) { ci == item })
+    }).size();
+    let secondaryMissing : Nat = missing.filter(func(item) {
+      parsed.secondary_items.any(func(si) { si == item })
+    }).size();
+
+    // Determine prompt log presence from notes text and signals
+    let notesLower = notesText.toLower();
+    let has_prompt_log : Bool = mergedSignals.has_ai_log or
+      notesLower.contains(#text "prompt_log") or
+      notesLower.contains(#text "ai_log") or
+      notesLower.contains(#text "chatgpt") or
+      notesLower.contains(#text "gpt_log") or
+      notesLower.contains(#text "openai.com/share") or
+      notesLower.contains(#text "chat.openai") or
+      notesLower.contains(#text "claude.ai") or
+      notesLower.contains(#text "gemini");
+
+    let ignore_prompt_log : Bool = overrides.ignore_prompt_log;
+
     let rawScores : Types.Scores = {
-      coverage     = Scoring.coverageScore(matched, total);
-      stackMatch   = Scoring.stackMatchScore(parsed, mergedSignals);
-      completeness = Scoring.completenessScore(mergedSignals);
-      depth        = Scoring.depthScore(mergedSignals);
-      docs         = Scoring.docsScore(mergedSignals);
-      demo         = Scoring.demoScore(mergedSignals);
-      aiUsage      = Scoring.aiUsageScore(mergedSignals);
+      coverage      = Scoring.coverageScore(matched, total, coreMissing, secondaryMissing);
+      stackMatch    = Scoring.stackMatchScore(mergedSignals, parsed.required_items);
+      completeness  = Scoring.completenessScore(mergedSignals);
+      depth         = Scoring.depthScore(mergedSignals, mergedSignals.file_count);
+      docs          = Scoring.docsScore(mergedSignals);
+      demoReadiness = Scoring.demoScore(mergedSignals);
+      aiUsage       = Scoring.aiUsageScore(mergedSignals, has_prompt_log, ignore_prompt_log);
     };
 
     // Apply weight overrides (per-evaluation, does not modify core engine)
     let scores = Scoring.applyWeightOverrides(rawScores, overrides);
 
-    let fs        = Scoring.finalScore(scores);
+    let fs        = Scoring.finalScore(scores, overrides);
     let alignment = Scoring.alignmentFromScore(fs);
     let redFlags  = Scoring.buildRedFlags(scores, parsed, mergedSignals);
     let summary   = Scoring.buildSummary(scores, fs, missing, redFlags, parsed, mergedSignals);
     let projType  = Scoring.projectType(parsed, mergedSignals);
-    let verdict   = Scoring.buildRecruiterVerdict(fs, scores, mergedSignals);
+    let verdict   = Scoring.buildRecruiterVerdict(scores, fs, missing);
 
     let result : Types.EvaluationResult = {
       project_type          = projType;
@@ -442,6 +738,8 @@ mixin (
       timestamp             = Time.now();
       recruiter_verdict     = ?verdict;
       applied_instructions  = overrides.applied_instructions;
+      strengths             = verdict.strengths;
+      criticalGaps          = verdict.criticalGaps;
     };
 
     evalCache.add(ck, result);
@@ -535,7 +833,7 @@ mixin (
           let errorResult : Types.EvaluationResult = {
             project_type          = "Error";
             alignment             = #Low;
-            scores                = { coverage = 0; stackMatch = 0; completeness = 0; depth = 0; docs = 0; demo = 0; aiUsage = 0 };
+            scores                = { coverage = 0; stackMatch = 0; completeness = 0; depth = 0; docs = 0; demoReadiness = 0; aiUsage = 0 };
             final_score           = 0;
             missing_items         = [];
             red_flags             = ["Evaluation failed for this repo URL"];
@@ -544,6 +842,8 @@ mixin (
             timestamp             = Time.now();
             recruiter_verdict     = null;
             applied_instructions  = [];
+            strengths             = [];
+            criticalGaps          = [];
           };
           errorResult;
         };
@@ -675,7 +975,7 @@ mixin (
           entry.sum_completeness += s.completeness;
           entry.sum_depth        += s.depth;
           entry.sum_docs         += s.docs;
-          entry.sum_demo         += s.demo;
+          entry.sum_demo         += s.demoReadiness;
           entry.sum_ai_usage     += s.aiUsage;
         };
         case null {
@@ -689,7 +989,7 @@ mixin (
             var sum_completeness = s.completeness;
             var sum_depth        = s.depth;
             var sum_docs         = s.docs;
-            var sum_demo         = s.demo;
+            var sum_demo         = s.demoReadiness;
             var sum_ai_usage     = s.aiUsage;
           });
         };

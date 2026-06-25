@@ -59,7 +59,7 @@ const METRIC_LABELS: Record<string, string> = {
   completeness: "Completeness",
   depth: "Depth",
   docs: "Documentation",
-  demo: "Demo",
+  demoReadiness: "Demo",
   aiUsage: "AI Usage",
 };
 
@@ -93,8 +93,11 @@ export function useDashboard(
     for (const r of filteredRecords) {
       const s = Number(r.result.final_score);
       sum += s;
-      if (s >= 8.5) pass++;
-      else if (s >= 6) caution++;
+      // verdict-based: use backend verdict if available, else threshold
+      const vRaw = r.result.recruiter_verdict?.verdict;
+      const v = vRaw ? String(vRaw).toLowerCase() : null;
+      if (v === "pass" || (!v && s >= 80)) pass++;
+      else if (v === "caution" || (!v && s >= 60)) caution++;
       else fail++;
       if (s > topScore) {
         topScore = s;
@@ -154,21 +157,21 @@ export function useDashboard(
     let fail = 0;
     for (const r of filteredRecords) {
       const s = Number(r.result.final_score);
-      if (s >= 8.5) pass++;
-      else if (s >= 6) caution++;
+      const vRaw = r.result.recruiter_verdict?.verdict;
+      const v = vRaw ? String(vRaw).toLowerCase() : null;
+      if (v === "pass" || (!v && s >= 80)) pass++;
+      else if (v === "caution" || (!v && s >= 60)) caution++;
       else fail++;
     }
     const out: VerdictDatum[] = [];
-    if (pass > 0)
-      out.push({ name: "Highly Recommended", value: pass, key: "pass" });
+    if (pass > 0) out.push({ name: "PASS", value: pass, key: "pass" });
     if (caution > 0)
       out.push({
-        name: "Proceed with Caution",
+        name: "CAUTION",
         value: caution,
         key: "caution",
       });
-    if (fail > 0)
-      out.push({ name: "Not Recommended", value: fail, key: "fail" });
+    if (fail > 0) out.push({ name: "FAIL", value: fail, key: "fail" });
     return out;
   }, [filteredRecords]);
 

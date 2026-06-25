@@ -113,29 +113,26 @@ module {
   public func hasJunkContent(raw : Text) : Bool {
     var total   : Nat = 0;
     var junk    : Nat = 0;
-    var nonAsciiRun    : Nat = 0;  // current consecutive non-ASCII run length
-    var nonAsciiRuns   : Nat = 0;  // count of runs with length >= 3
+    var nonAsciiRun    : Nat = 0;
+    var nonAsciiRuns   : Nat = 0;
 
     for (c in raw.toIter()) {
       total += 1;
       let code = c.toNat32().toNat();
-      // printable ASCII is 32–126; newlines/tabs are OK — everything else is junk
       if (not (code >= 32 and code < 127) and code != 10 and code != 9 and code != 13) {
         junk += 1;
         nonAsciiRun += 1;
       } else {
-        // end of a non-ASCII run — if it was >= 3, count it
         if (nonAsciiRun >= 3) { nonAsciiRuns += 1 };
         nonAsciiRun := 0;
       };
     };
-    // Close any trailing run
     if (nonAsciiRun >= 3) { nonAsciiRuns += 1 };
 
     if (total == 0) return false;
 
-    // Condition 1: > 2% non-printable chars
-    if ((junk * 100) / total > 2) return true;
+    // Condition 1: > 5% non-printable chars (was 2% — raised because we now clean aggressively before returning)
+    if ((junk * 100) / total > 5) return true;
 
     // Condition 2: 5+ runs of 3+ consecutive non-ASCII chars (binary garbage indicator)
     if (nonAsciiRuns >= 5) return true;
@@ -262,15 +259,63 @@ module {
         };
         j += 1;
       };
-      let fbCleaned = cleanExtractedText(fallback);
+      // Post-process fallback: strip known PDF binary-structure markers line by line.
+      // The raw ASCII scan picks up binary tokens like '3 0 obj <<', 'endobj', '/Type /Page', etc.
+      // Strip any segment containing these markers so only human-readable text survives.
+      let fbCleaned = stripPdfBinaryMarkers(cleanExtractedText(fallback));
       let fn = normalize(fbCleaned);
-      if (fn.size() >= 50) {
+      if (fn.size() >= 20) {
         return #ok({ text = fn; is_clean = not hasJunkContent(fn) });
       };
-      return #err(PDF_FAIL);
+      return #err("PDF content could not be extracted — the document may use compressed streams. Please copy and paste the assignment text manually.");
     };
 
     #ok({ text = n; is_clean = not hasJunkContent(n) });
+  };
+
+  // ── PDF binary marker stripper ─────────────────────────────────────────────
+  /// Strip PDF structural tokens that bleed through the printable-ASCII fallback scan.
+  /// Works word-by-word: any word containing a PDF binary marker is dropped entirely.
+  /// Returns only the surviving human-readable tokens joined by spaces.
+  func stripPdfBinaryMarkers(raw : Text) : Text {
+    // Split into lines; within each line split into space-separated tokens.
+    // Drop any token that matches a known PDF structural keyword or starts with /.
+    // Also drop tokens that are numeric sequences (PDF object refs like "3" "0" "obj").
+    var outLines : [Text] = [];
+    for (line in raw.split(#char '\n').toArray().vals()) {
+      let tokens = line.split(#char ' ').toArray();
+      var kept : [Text] = [];
+      for (tok in tokens.vals()) {
+        let tl = tok.toLower();
+        // Drop if it's a known PDF keyword or structural marker
+        let isPdfKeyword =
+          tl == "obj" or tl == "endobj" or tl == "stream" or tl == "endstream" or
+          tl == "xref" or tl == "trailer" or tl == "startxref" or
+          tl == "null" or tl == "true" or tl == "false" or
+          tok.startsWith(#text "%PDF") or tok.startsWith(#text "%%") or
+          tok.startsWith(#text "<<") or tok.startsWith(#text ">>") or
+          tok.startsWith(#text "/") or tok.startsWith(#text "[") or
+          tok.endsWith(#text "obj") or tok.endsWith(#text "R") and tok.size() <= 6 or
+          tl.contains(#text "endobj") or tl.contains(#text "xref") or
+          tl.contains(#text "%pdf") or tl.contains(#text "<<") or tl.contains(#text ">>");
+        // Drop pure-numeric tokens (object number references)
+        var isNumeric = tok.size() > 0 and tok.size() <= 8;
+        if (isNumeric) {
+          for (c in tok.toIter()) {
+            let code = c.toNat32().toNat();
+            if (not (code >= 48 and code <= 57)) { isNumeric := false };
+          };
+        };
+        if (not isPdfKeyword and not isNumeric and tok.size() > 0) {
+          kept := kept.concat([tok]);
+        };
+      };
+      let lineOut = kept.vals().join(" ");
+      if (lineOut.size() > 0) {
+        outLines := outLines.concat([lineOut]);
+      };
+    };
+    outLines.vals().join("\n");
   };
 
   /// Decode a hex nibble ASCII byte to 0–15 (returns 255 if invalid).
@@ -472,8 +517,39 @@ module {
   };
 
   // ── ZIP text extractor ───────────────────────────────────────────────────────
-  // Scan ZIP entries for stored (method 0) TXT or XML files and concatenate their text.
-  // Binary files are skipped (non-UTF8 or mostly non-printable).
+  // Scan ZIP entries for text-like files. For stored (method 0) entries, read directly.
+  // For deflate-compressed (method 8) text files < 500KB, read raw bytes as UTF-8 best-effort.
+  // Supports: .txt, .md, .csv, .json, .xml, .yaml, .yml, .toml, .ini, .rst,
+  //           .js, .ts, .jsx, .tsx, .py, .go, .java, .rb, .php, .cs, .swift,
+  //           .html, .css, .env, .sh, .Makefile
+  // Binary files (.png, .jpg, .gif, .mp4, .zip, .exe, .pdf, .docx) are skipped.
+
+  func isTextExtension(fname : Text) : Bool {
+    let fl = fname.toLower();
+    fl.endsWith(#text ".txt") or fl.endsWith(#text ".md") or fl.endsWith(#text ".csv") or
+    fl.endsWith(#text ".json") or fl.endsWith(#text ".xml") or fl.endsWith(#text ".yaml") or
+    fl.endsWith(#text ".yml") or fl.endsWith(#text ".toml") or fl.endsWith(#text ".ini") or
+    fl.endsWith(#text ".rst") or fl.endsWith(#text ".js") or fl.endsWith(#text ".ts") or
+    fl.endsWith(#text ".jsx") or fl.endsWith(#text ".tsx") or fl.endsWith(#text ".py") or
+    fl.endsWith(#text ".go") or fl.endsWith(#text ".java") or fl.endsWith(#text ".rb") or
+    fl.endsWith(#text ".php") or fl.endsWith(#text ".cs") or fl.endsWith(#text ".swift") or
+    fl.endsWith(#text ".html") or fl.endsWith(#text ".css") or fl.endsWith(#text ".sh") or
+    fl.endsWith(#text ".env") or fl.endsWith(#text ".rs") or fl.endsWith(#text ".kt") or
+    fl == "makefile" or fl.endsWith(#text "/makefile") or
+    fl == "dockerfile" or fl.endsWith(#text "/dockerfile");
+  };
+
+  func isBinaryExtension(fname : Text) : Bool {
+    let fl = fname.toLower();
+    fl.endsWith(#text ".png") or fl.endsWith(#text ".jpg") or fl.endsWith(#text ".jpeg") or
+    fl.endsWith(#text ".gif") or fl.endsWith(#text ".mp4") or fl.endsWith(#text ".mp3") or
+    fl.endsWith(#text ".zip") or fl.endsWith(#text ".exe") or fl.endsWith(#text ".dll") or
+    fl.endsWith(#text ".so") or fl.endsWith(#text ".o") or fl.endsWith(#text ".class") or
+    fl.endsWith(#text ".jar") or fl.endsWith(#text ".war") or fl.endsWith(#text ".ico") or
+    fl.endsWith(#text ".woff") or fl.endsWith(#text ".woff2") or fl.endsWith(#text ".ttf") or
+    fl.endsWith(#text ".eot") or fl.endsWith(#text ".svg") or fl.endsWith(#text ".webp") or
+    fl.endsWith(#text ".pdf") or fl.endsWith(#text ".docx") or fl.endsWith(#text ".xlsx");
+  };
 
   func extractZip(bytes : Blob) : { #ok : { text : Text; is_clean : Bool }; #err : Text } {
     let arr = bytes.toArray();
@@ -485,12 +561,15 @@ module {
 
     var out = "";
     var i   = 0;
+    let MAX_ENTRY : Nat = 512_000; // 500KB per entry
 
     while (i + 30 < len) {
       if (arr[i] == 0x50 and arr[i + 1] == 0x4B and arr[i + 2] == 0x03 and arr[i + 3] == 0x04) {
         let method    = arr[i + 8].toNat()  + arr[i + 9].toNat()  * 256;
         let compSz    = arr[i + 18].toNat() + arr[i + 19].toNat() * 256
                       + arr[i + 20].toNat() * 65536 + arr[i + 21].toNat() * 16777216;
+        let uncompSz  = arr[i + 22].toNat() + arr[i + 23].toNat() * 256
+                      + arr[i + 24].toNat() * 65536 + arr[i + 25].toNat() * 16777216;
         let fnLen     = arr[i + 26].toNat() + arr[i + 27].toNat() * 256;
         let exLen     = arr[i + 28].toNat() + arr[i + 29].toNat() * 256;
         let dataStart = i + 30 + fnLen + exLen;
@@ -504,37 +583,113 @@ module {
         };
 
         let fnameLower = fname.toLower();
+        // Skip directory entries (end with /)
+        let isDir = fname.endsWith(#text "/");
+        let canRead = not isDir and compSz > 0 and dataStart + compSz <= len;
 
-        // Only process stored (method 0) text-like files
-        if (method == 0 and compSz > 0 and dataStart + compSz <= len and (
-          fnameLower.endsWith(#text ".txt") or
-          fnameLower.endsWith(#text ".xml") or
-          fnameLower.endsWith(#text ".md")  or
-          fnameLower.endsWith(#text ".csv") or
-          fnameLower.endsWith(#text ".json")
-        )) {
-          let fileBytes : [var Nat8] = Array.repeat(0 : Nat8, compSz).toVarArray();
-          var k = 0;
-          while (k < compSz) {
-            fileBytes[k] := arr[dataStart + k];
-            k += 1;
-          };
-          let blob = Blob.fromArray(fileBytes.toArray());
-          switch (blob.decodeUtf8()) {
-            case (?t) {
-              // Quick printability check: count printable chars
-              var printable = 0;
-              var total     = 0;
-              for (c in t.toIter()) {
-                total += 1;
-                let code = c.toNat32().toNat();
-                if (code >= 32 and code < 127) { printable += 1 };
+        // Classify file type
+        let isImageOrExe =
+          fnameLower.endsWith(#text ".png") or fnameLower.endsWith(#text ".jpg") or
+          fnameLower.endsWith(#text ".jpeg") or fnameLower.endsWith(#text ".gif") or
+          fnameLower.endsWith(#text ".svg") or fnameLower.endsWith(#text ".ico") or
+          fnameLower.endsWith(#text ".webp") or fnameLower.endsWith(#text ".exe") or
+          fnameLower.endsWith(#text ".dll") or fnameLower.endsWith(#text ".so") or
+          fnameLower.endsWith(#text ".class") or fnameLower.endsWith(#text ".woff") or
+          fnameLower.endsWith(#text ".woff2") or fnameLower.endsWith(#text ".ttf") or
+          fnameLower.endsWith(#text ".mp4") or fnameLower.endsWith(#text ".mp3");
+
+        let isPdfEntry   = fnameLower.endsWith(#text ".pdf");
+        let isDocxEntry  = fnameLower.endsWith(#text ".docx") or fnameLower.endsWith(#text ".doc");
+        let isXlsxEntry  = fnameLower.endsWith(#text ".xlsx") or fnameLower.endsWith(#text ".xls");
+        let isNestedZip  = fnameLower.endsWith(#text ".zip");
+
+        if (canRead and not isImageOrExe and not isNestedZip) {
+          // Decide how to handle this entry
+          if (isPdfEntry and method == 0 and compSz < MAX_ENTRY) {
+            // Stored PDF — try the PDF extractor directly on the raw bytes
+            let fileBytes : [var Nat8] = Array.repeat(0 : Nat8, compSz).toVarArray();
+            var k = 0;
+            while (k < compSz) { fileBytes[k] := arr[dataStart + k]; k += 1 };
+            let blob = Blob.fromArray(fileBytes.toArray());
+            switch (extractPdf(blob)) {
+              case (#ok({ text; is_clean = _ })) {
+                if (text.size() > 0) {
+                  out #= "\n[" # fname # "]\n" # text;
+                };
               };
-              if (total > 0 and (printable * 100) / total >= 70) {
-                out #= "\n[" # fname # "]\n" # t;
+              case (#err(_)) {}; // skip unreadable PDF silently
+            };
+          } else if (isDocxEntry and method == 0 and compSz < MAX_ENTRY) {
+            // Stored DOCX — try the DOCX extractor
+            let fileBytes : [var Nat8] = Array.repeat(0 : Nat8, compSz).toVarArray();
+            var k = 0;
+            while (k < compSz) { fileBytes[k] := arr[dataStart + k]; k += 1 };
+            let blob = Blob.fromArray(fileBytes.toArray());
+            switch (extractDocx(blob)) {
+              case (#ok({ text; is_clean = _ })) {
+                if (text.size() > 0) {
+                  out #= "\n[" # fname # "]\n" # text;
+                };
+              };
+              case (#err(_)) {}; // skip silently
+            };
+          } else if (isXlsxEntry and method == 0 and compSz < MAX_ENTRY) {
+            // Stored XLSX — try the XLSX extractor
+            let fileBytes : [var Nat8] = Array.repeat(0 : Nat8, compSz).toVarArray();
+            var k = 0;
+            while (k < compSz) { fileBytes[k] := arr[dataStart + k]; k += 1 };
+            let blob = Blob.fromArray(fileBytes.toArray());
+            switch (extractXlsx(blob)) {
+              case (#ok({ text; is_clean = _ })) {
+                if (text.size() > 0) {
+                  out #= "\n[" # fname # "]\n" # text;
+                };
+              };
+              case (#err(_)) {}; // skip silently
+            };
+          } else if (isPdfEntry or isDocxEntry or isXlsxEntry) {
+            // Deflate-compressed binary — skip gracefully (cannot decompress natively)
+          } else {
+            // Text / code file — read as UTF-8 (stored) or best-effort ASCII (deflated)
+            let shouldRead = method == 0 or (method == 8 and uncompSz < MAX_ENTRY and compSz < MAX_ENTRY);
+            if (shouldRead) {
+              let fileBytes : [var Nat8] = Array.repeat(0 : Nat8, compSz).toVarArray();
+              var k = 0;
+              while (k < compSz) { fileBytes[k] := arr[dataStart + k]; k += 1 };
+              let blob = Blob.fromArray(fileBytes.toArray());
+              let text : ?Text = if (method == 0) {
+                blob.decodeUtf8();
+              } else {
+                // Best-effort: extract printable ASCII from raw deflate bytes.
+                // Keep content only if >60% of characters are printable ASCII.
+                var asciiOut = "";
+                var asciiCount = 0;
+                for (b in fileBytes.vals()) {
+                  if (b >= 32 and b <= 126) {
+                    asciiOut #= b2t(b);
+                    asciiCount += 1;
+                  } else if (b == 10 or b == 13) {
+                    asciiOut #= "\n";
+                  };
+                };
+                if (asciiCount > 50) ?asciiOut else null;
+              };
+              switch (text) {
+                case (?t) {
+                  var printable = 0;
+                  var total     = 0;
+                  for (c in t.toIter()) {
+                    total += 1;
+                    let code = c.toNat32().toNat();
+                    if (code >= 32 and code < 127) { printable += 1 };
+                  };
+                  if (total > 0 and (printable * 100) / total >= 60) {
+                    out #= "\n[" # fname # "]\n" # t;
+                  };
+                };
+                case null {};
               };
             };
-            case null {};
           };
         };
 
@@ -548,7 +703,7 @@ module {
     let cleaned = cleanExtractedText(out);
     let n = normalizeMax(cleaned, MAX_NOTES);
     if (n.size() == 0) {
-      #err("No readable text files found in ZIP archive.")
+      #err("ZIP archive contained no readable text content. Try extracting the ZIP and uploading files individually.")
     } else {
       #ok({ text = n; is_clean = not hasJunkContent(n) })
     };
@@ -655,9 +810,17 @@ module {
     } else if (lower.endsWith(#text ".zip")) {
       extractZip(fileBytes);
     } else if (lower.endsWith(#text ".rar")) {
-      // RAR requires a native library — return informative message for manual review.
-      let cleaned = cleanExtractedText("RAR format: " # fileName # " — manual review required. Please extract and paste the relevant text.");
-      #ok({ text = cleaned; is_clean = true });
+      // RAR: detect magic bytes (52 61 72 21 1A 07 = "Rar!\x1A\x07")
+      let arr = fileBytes.toArray();
+      let isRar = arr.size() >= 7 and
+        arr[0] == 0x52 and arr[1] == 0x61 and arr[2] == 0x72 and arr[3] == 0x21 and
+        arr[4] == 0x1A and arr[5] == 0x07;
+      if (isRar) {
+        #err("RAR archive detected. RAR decompression is not supported natively. Please re-upload as a ZIP file for automatic extraction, or paste the relevant contents manually.");
+      } else {
+        // Not actually a RAR (extension mismatch) — try generic fallback
+        extractGeneric(fileBytes);
+      };
     } else {
       // Generic fallback: attempt UTF-8 decode
       extractGeneric(fileBytes);

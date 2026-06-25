@@ -3,9 +3,16 @@ import type {
   EvaluationResult,
   RecruiterVerdict,
   Scores,
+  Variant_fail_pass_caution,
 } from "./backend";
 
-export type { Alignment, EvaluationResult, RecruiterVerdict, Scores };
+export type {
+  Alignment,
+  EvaluationResult,
+  RecruiterVerdict,
+  Scores,
+  Variant_fail_pass_caution,
+};
 
 export type { RoleStats } from "./backend";
 
@@ -30,9 +37,10 @@ export interface WeightOverrides {
   completeness_mult: number;
   depth_mult: number;
   docs_mult: number;
-  demo_mult: number;
+  demoReadiness_mult: number;
   ai_mult: number;
   ignore_notes: boolean;
+  ignore_prompt_log?: boolean;
   applied_instructions: string[];
 }
 
@@ -49,3 +57,6 @@ export interface EvaluationRecord {
 export type BackendEvaluationRecord = Omit<EvaluationRecord, "owner"> & {
   owner?: string;
 };
+
+/** Verdict string values from backend Variant enum */
+export type VerdictLabel = "PASS" | "CAUTION" | "FAIL";

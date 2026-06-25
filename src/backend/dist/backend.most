@@ -17,12 +17,14 @@ type EvaluationResult__322217775 =
     alignment : Alignment__119427168;
     applied_instructions : [Text];
     cached : Bool;
+    criticalGaps : [Text];
     final_score : Nat;
     missing_items : [Text];
     project_type : Text;
     recruiter_verdict : ?RecruiterVerdict__836279244;
     red_flags : [Text];
     scores : Scores__805501232;
+    strengths : [Text];
     summary : Text;
     timestamp : Timestamp__301639476
   };
@@ -33,15 +35,28 @@ type Nat__490723111 = Nat__920180692;
 type Nat__920180692 = Nat;
 type Node__46230540<K, V> =
   {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
-type ParsedAssignment__449578808 = {required_items : [Text]; role : Text};
+type ParsedAssignment__449578808 =
+  {
+    core_items : [Text];
+    required_items : [Text];
+    role : Text;
+    secondary_items : [Text]
+  };
 type RecruiterVerdict__836279244 =
-  {emoji : Text; technical_debt : Text; verdict : Text; why : Text};
+  {
+    criticalGaps : [Text];
+    emoji : Text;
+    strengths : [Text];
+    technical_debt : Text;
+    verdict : {#caution; #fail; #pass};
+    why : Text
+  };
 type Scores__805501232 =
   {
     aiUsage : Nat;
     completeness : Nat;
     coverage : Nat;
-    demo : Nat;
+    demoReadiness : Nat;
     depth : Nat;
     docs : Nat;
     stackMatch : Nat

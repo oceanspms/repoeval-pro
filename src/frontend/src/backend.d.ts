@@ -9,6 +9,7 @@ export interface None {
 export type Option<T> = Some<T> | None;
 export interface EvaluationResult {
     applied_instructions: Array<string>;
+    strengths: Array<string>;
     scores: Scores;
     summary: string;
     missing_items: Array<string>;
@@ -19,6 +20,7 @@ export interface EvaluationResult {
     project_type: string;
     alignment: Alignment;
     recruiter_verdict?: RecruiterVerdict;
+    criticalGaps: Array<string>;
 }
 export type ExtractTextResult = {
     __kind__: "ok";
@@ -42,13 +44,15 @@ export interface TransformationInput {
 }
 export interface RecruiterVerdict {
     why: string;
+    strengths: Array<string>;
     emoji: string;
-    verdict: string;
+    verdict: Variant_fail_pass_caution;
     technical_debt: string;
+    criticalGaps: Array<string>;
 }
 export interface Scores {
+    demoReadiness: bigint;
     stackMatch: bigint;
-    demo: bigint;
     docs: bigint;
     coverage: bigint;
     completeness: bigint;
@@ -91,17 +95,16 @@ export enum Alignment {
     High = "High",
     Medium = "Medium"
 }
+export enum Variant_fail_pass_caution {
+    fail = "fail",
+    pass = "pass",
+    caution = "caution"
+}
 export interface backendInterface {
     clearCache(): Promise<void>;
     deleteEvaluation(id: string): Promise<boolean>;
     evaluate(repo_urls: Array<string>, assignment_description: string, optional_notes: string | null): Promise<Array<EvaluationResult>>;
-    /**
-     * / Cache: evaluation results keyed by (repo_url | assignment_description)
-     */
     extractFileText(fileBytes: Uint8Array, fileName: string): Promise<ExtractTextResult>;
-    /**
-     * / Persistent history store — survives canister upgrades via enhanced orthogonal persistence
-     */
     extractNotesFileText(fileBytes: Uint8Array, fileName: string): Promise<ExtractTextResult>;
     fetchGoogleDocText(url: string): Promise<ExtractTextResult>;
     getCacheStats(): Promise<{

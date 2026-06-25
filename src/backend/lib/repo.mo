@@ -70,7 +70,159 @@ module {
     needles.any(func(n) { lower.contains(#text n) });
   };
 
+  /// Count non-overlapping occurrences of needle in haystack.
+  func countOccurrences(haystack : Text, needle : Text) : Nat {
+    let parts = haystack.split(#text needle).toArray();
+    if (parts.size() <= 1) 0 else parts.size() - 1
+  };
+
   // ── signal extraction ─────────────────────────────────────────────────────
+
+  /// Build the raw content URL for a specific file in a GitHub repo.
+  public func rawFileUrl(owner : Text, repo : Text, path : Text) : Text {
+    "https://raw.githubusercontent.com/" # owner # "/" # repo # "/HEAD/" # path;
+  };
+
+  /// Given a flat list of file paths, select priority source files to fetch (max 8 total).
+  /// Priority order: package.json, entry files, Dockerfile, .env.example, test files, top src files.
+  public func selectFilesToFetch(filePaths : [Text]) : [Text] {
+    var selected : [Text] = [];
+    let pl = filePaths.map(func(p) { p.toLower() });
+
+    // Helper: add first match from candidates that exists in paths
+    func addFirst(candidates : [Text]) {
+      label search for (c in candidates.values()) {
+        let cl = c.toLower();
+        let idx = pl.findIndex(func(p) { p == cl or p.endsWith(#text ("/" # cl)) });
+        switch idx {
+          case (?i) {
+            selected := selected.concat([filePaths[i]]);
+            break search;
+          };
+          case null {};
+        };
+      };
+    };
+
+    // 1. package.json (highest priority)
+    addFirst(["package.json"]);
+    // 2. Entry point files
+    addFirst(["src/index.ts", "src/main.ts", "src/app.ts", "server.ts", "src/server.ts",
+              "src/index.js", "src/main.js", "src/app.js", "server.js", "index.ts",
+              "app.ts", "index.js", "main.py", "app.py", "main.go"]);
+    // 3. Dockerfile
+    addFirst(["Dockerfile", "dockerfile"]);
+    // 4. .env.example
+    addFirst([".env.example", ".env.sample", "env.example"]);
+    // 5–6: Up to 2 test files
+    var testCount = 0;
+    for (p in filePaths.values()) {
+      if (testCount >= 2) ();
+      let pl2 = p.toLower();
+      if ((pl2.contains(#text ".test.") or pl2.contains(#text ".spec.")) and
+          not selected.any(func(s) { s == p })) {
+        selected := selected.concat([p]);
+        testCount += 1;
+      };
+    };
+    // 7–8: Up to 2 significant src files not yet selected
+    var srcCount = 0;
+    for (p in filePaths.values()) {
+      if (srcCount >= 2) ();
+      let pl2 = p.toLower();
+      let isSource = (pl2.endsWith(#text ".ts") or pl2.endsWith(#text ".js") or
+                      pl2.endsWith(#text ".tsx") or pl2.endsWith(#text ".jsx") or
+                      pl2.endsWith(#text ".py") or pl2.endsWith(#text ".go") or
+                      pl2.endsWith(#text ".java") or pl2.endsWith(#text ".rb")) and
+                     (pl2.contains(#text "src/") or pl2.contains(#text "app/") or
+                      pl2.contains(#text "lib/") or pl2.contains(#text "controllers/") or
+                      pl2.contains(#text "routes/") or pl2.contains(#text "components/"));
+      if (isSource and not selected.any(func(s) { s == p })) {
+        selected := selected.concat([p]);
+        srcCount += 1;
+      };
+    };
+    selected;
+  };
+
+  /// Parse package.json content to extract framework names.
+  public func parseFrameworks(pkgJson : Text) : [Text] {
+    // Look for known framework/library names in the dependencies section
+    let knownFrameworks : [Text] = [
+      "react", "vue", "angular", "svelte", "next", "nuxt", "gatsby", "remix",
+      "express", "fastify", "koa", "hapi", "nest", "nestjs",
+      "django", "flask", "fastapi", "rails", "laravel", "spring",
+      "tailwindcss", "vite", "webpack", "parcel", "rollup",
+      "prisma", "mongoose", "sequelize", "typeorm",
+      "jest", "vitest", "mocha", "jasmine", "pytest",
+      "typescript", "graphql", "redux", "zustand", "mobx"
+    ];
+    let lower = pkgJson.toLower();
+    knownFrameworks.filter(func(fw) { lower.contains(#text fw) });
+  };
+
+  /// Count TODO/FIXME occurrences in source file content.
+  public func countTodosInSource(content : Text) : Nat {
+    let lower = content.toLower();
+    countOccurrences(lower, "todo") + countOccurrences(lower, "fixme");
+  };
+
+  /// Count test function occurrences (it/test/describe blocks) in test file content.
+  public func countTests(content : Text) : Nat {
+    let lower = content.toLower();
+    // Match "it(", "test(", "describe(", "def test_", "func Test"
+    countOccurrences(lower, "it(") +
+    countOccurrences(lower, "test(") +
+    countOccurrences(lower, "describe(") +
+    countOccurrences(lower, "def test_") +
+    countOccurrences(lower, "func test");
+  };
+
+  /// Check if a Dockerfile uses multi-stage builds.
+  public func isMultistageDockerfile(content : Text) : Bool {
+    let lower = content.toLower();
+    // Multi-stage = more than one FROM instruction
+    countOccurrences(lower, "\nfrom ") + countOccurrences(lower, "\nFROM ") >= 2 or
+    countOccurrences(lower, "from ") >= 2;
+  };
+
+  /// Check if package.json has start or dev scripts.
+  public func hasStartScripts(pkgJson : Text) : Bool {
+    let lower = pkgJson.toLower();
+    lower.contains(#text "\"start\"") or lower.contains(#text "\"dev\"") or
+    lower.contains(#text "'start'") or lower.contains(#text "'dev'");
+  };
+
+  /// Build a short summary for a given file based on its content.
+  public func buildFileSummary(path : Text, content : Text) : Text {
+    let pl = path.toLower();
+    let _firstLine = switch (content.split(#char '\n').next()) {
+      case (?l) l.trim(#char ' ');
+      case null "";
+    };
+    let size = content.size();
+    if (pl.endsWith(#text "package.json")) {
+      let frameworks = parseFrameworks(content);
+      if (frameworks.size() > 0) {
+        "package.json — frameworks: " # frameworks.values().join(", ");
+      } else {
+        "package.json (" # size.toText() # " bytes)"
+      };
+    } else if (pl.contains(#text "dockerfile")) {
+      if (isMultistageDockerfile(content)) "Dockerfile (multi-stage, production-grade)"
+      else "Dockerfile (single-stage)";
+    } else if (pl.endsWith(#text ".env.example") or pl.endsWith(#text ".env.sample")) {
+      let lines = content.split(#char '\n').toArray().size();
+      ".env.example (" # lines.toText() # " config keys documented)";
+    } else if (pl.contains(#text ".test.") or pl.contains(#text ".spec.")) {
+      let tc = countTests(content);
+      path # " (" # tc.toText() # " test cases detected)";
+    } else {
+      let todos = countTodosInSource(content);
+      let note = if (todos > 0) " — " # todos.toText() # " TODOs" else "";
+      path # " (" # size.toText() # " bytes" # note # ")";
+    };
+  };
 
   /// Extract repo signals from raw README text and a flat file-path list.
   public func extractSignals(
@@ -78,6 +230,26 @@ module {
     filePaths  : [Text],
   ) : Types.RepoSignals {
     let wc = wordCount(readmeText);
+    let fc = filePaths.size();
+
+    // Count TODO/FIXME occurrences across file paths (path names can contain hints,
+    // but more importantly we scan the readme for TODO markers)
+    let readmeLower = readmeText.toLower();
+    let todoInReadme : Nat = countOccurrences(readmeLower, "todo") + countOccurrences(readmeLower, "fixme");
+    // Also check file path names for common todo/fixme patterns
+    let todoInPaths : Nat = filePaths.foldLeft<Text, Nat>(0, func(acc, p) {
+      let pl = pathLower(p);
+      if (pl.contains(#text "todo") or pl.contains(#text "fixme")) acc + 1 else acc
+    });
+    let todoCount = todoInReadme + todoInPaths;
+
+    // Estimate error handler count from readme mentions
+    let errorHandlerCount : Nat =
+      countOccurrences(readmeLower, "error handling") +
+      countOccurrences(readmeLower, "try/catch") +
+      countOccurrences(readmeLower, "exception") +
+      (if (anyPath(filePaths, func(p) { p.contains(#text "middleware/error") or p.contains(#text "error.handler") or p.contains(#text "errorhandler") })) 2 else 0) +
+      (if (anyPath(filePaths, func(p) { p.contains(#text "catch") or p.contains(#text "error") })) 1 else 0);
 
     {
       readme_text       = readmeText;
@@ -119,9 +291,39 @@ module {
         p.contains(#text "routes") or p.contains(#text "router") or p.contains(#text "endpoints") or
         p.contains(#text "api/v") or p.contains(#text "swagger") or p.contains(#text "openapi")
       });
-      has_demo_link     = hasDemoLink(readmeText);
-      has_ai_log        = hasAiLog(filePaths);
+      has_demo_link       = hasDemoLink(readmeText);
+      has_working_demo_link = false;  // default false — verified by async HTTP call in evaluation-api.mo
+      demo_url            = extractDemoUrl(readmeText);
+      has_ai_log          = hasAiLog(filePaths);
       readme_word_count = wc;
+      // Extended signals
+      todo_count          = todoCount;
+      has_env_example     = anyPath(filePaths, func(p) {
+        p.contains(#text ".env.example") or p.contains(#text ".env.sample") or
+        p.contains(#text ".env.template") or p.contains(#text "env.example")
+      });
+      has_seed_data       = anyPath(filePaths, func(p) {
+        p.contains(#text "seeds/") or p.contains(#text "seed.sql") or
+        p.contains(#text "seed.js") or p.contains(#text "seed.ts") or
+        p.contains(#text "seeders/") or p.contains(#text "fixtures/") or
+        p.contains(#text "seed_data") or p.contains(#text "initial_data")
+      });
+      has_setup_script    = anyPath(filePaths, func(p) {
+        p == "makefile" or p.endsWith(#text "/makefile") or
+        p.contains(#text "setup.sh") or p.contains(#text "start.sh") or
+        p.contains(#text "install.sh") or p.contains(#text "run.sh") or
+        p.contains(#text "bootstrap.sh")
+      });
+      error_handler_count = errorHandlerCount;
+      file_count          = fc;
+      // Deep crawl signals — defaults; populated by evaluation-api mixin after HTTP fetches
+      detected_frameworks   = [];
+      todo_count_source     = 0;
+      test_count            = 0;
+      has_dockerfile_multistage = false;
+      has_scripts           = false;
+      fetched_file_paths    = [];
+      key_file_summaries    = [];
     };
   };
 
@@ -133,6 +335,51 @@ module {
       "vercel.app", "netlify.app", "heroku", "railway.app",
       "render.com", "fly.dev", "github.io", "surge.sh"
     ]);
+  };
+
+  /// Extract the first demo URL found in the README text.
+  /// Looks for HTTP/HTTPS URLs near demo-related keywords.
+  /// Returns null if no demo URL is found.
+  public func extractDemoUrl(readmeText : Text) : ?Text {
+    let _lower = readmeText.toLower();
+    // Common demo hosting domains to scan for
+    let demoHosts : [Text] = [
+      "vercel.app", "netlify.app", "heroku", "railway.app",
+      "render.com", "fly.dev", "github.io", "surge.sh",
+      "pages.dev", "azurestaticapps.net", "web.app"
+    ];
+    // Scan README lines for any that contain a demo host URL
+    let lines = readmeText.split(#char '\n').toArray();
+    for (line in lines.values()) {
+      let lineLower = line.toLower();
+      // Check if this line contains a demo host
+      let hasDemoHost = demoHosts.any(func(host) { lineLower.contains(#text host) });
+      if (hasDemoHost) {
+        // Extract the first https?:// URL from this line
+        let tokens = line.split(#char ' ').toArray();
+        for (token in tokens.values()) {
+          let t = token.trim(#predicate(func(c : Char) : Bool {
+            c == '(' or c == ')' or c == '[' or c == ']' or c == '<' or c == '>' or c == '\"'
+          }));
+          if (t.startsWith(#text "https://") or t.startsWith(#text "http://")) {
+            return ?t;
+          };
+        };
+      };
+    };
+    // Fallback: scan for any https URL that ends with a demo-hosting domain
+    let tokens = readmeText.split(#char ' ').toArray();
+    for (token in tokens.values()) {
+      let t = token.trim(#predicate(func(c : Char) : Bool {
+        c == '(' or c == ')' or c == '[' or c == ']' or c == '<' or c == '>' or c == '\"' or c == '\n' or c == '\r'
+      }));
+      if (t.startsWith(#text "https://") or t.startsWith(#text "http://")) {
+        let tl = t.toLower();
+        let isDemoHost = demoHosts.any(func(host) { tl.contains(#text host) });
+        if (isDemoHost) return ?t;
+      };
+    };
+    null;
   };
 
   /// Detect whether an AI log file exists among the file paths.

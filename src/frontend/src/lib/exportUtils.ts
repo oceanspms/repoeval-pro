@@ -54,7 +54,7 @@ const FULL_HEADERS = [
   "completeness",
   "depth",
   "docs",
-  "demo",
+  "demoReadiness",
   "aiUsage",
   "summary_line1",
   "summary_line2",
@@ -97,7 +97,7 @@ function recordToRow(record: EvaluationRecord): string {
     String(Number(r.scores.completeness)),
     String(Number(r.scores.depth)),
     String(Number(r.scores.docs)),
-    String(Number(r.scores.demo)),
+    String(Number(r.scores.demoReadiness)),
     String(Number(r.scores.aiUsage)),
     lines[0] ?? "",
     lines[1] ?? "",
@@ -241,10 +241,10 @@ export function generateCandidateBrief(record: EvaluationRecord): void {
     emoji: finalScore > 8.5 ? "✅" : finalScore >= 6 ? "⚠️" : "❌",
     verdict:
       finalScore > 8.5
-        ? "Highly Recommended"
+        ? ("pass" as import("../types").Variant_fail_pass_caution)
         : finalScore >= 6
-          ? "Proceed with Caution"
-          : "Not Recommended",
+          ? ("caution" as import("../types").Variant_fail_pass_caution)
+          : ("fail" as import("../types").Variant_fail_pass_caution),
     why:
       finalScore > 8.5
         ? "Strong alignment with requirements and solid technical execution across all evaluated dimensions."
@@ -252,6 +252,8 @@ export function generateCandidateBrief(record: EvaluationRecord): void {
           ? "Partial alignment — key areas are covered but notable gaps remain."
           : "Does not adequately meet the assignment requirements.",
     technical_debt: finalScore > 8.5 ? "Production Ready" : "Prototype Grade",
+    strengths: [],
+    criticalGaps: [],
   };
 
   // Score color
@@ -286,7 +288,7 @@ export function generateCandidateBrief(record: EvaluationRecord): void {
     { label: "Completeness", value: Number(r.scores.completeness) },
     { label: "Depth", value: Number(r.scores.depth) },
     { label: "Documentation", value: Number(r.scores.docs) },
-    { label: "Demo", value: Number(r.scores.demo) },
+    { label: "Demo", value: Number(r.scores.demoReadiness) },
     { label: "AI Usage", value: Number(r.scores.aiUsage) },
   ];
 

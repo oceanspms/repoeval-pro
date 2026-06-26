@@ -1,6 +1,6 @@
 # RepoEval Pro Deployment Notes
 
-This repository is currently an ICP/Motoko backend plus a Vite/React frontend. It was generated through Caffeine, so some runtime wiring still uses Caffeine packages for actor creation and Internet Identity context. The application can be prepared for independent hosting, but a full removal of those packages should be handled as a separate migration.
+This repository is currently an ICP/Motoko backend plus a Vite/React frontend. It was generated through Caffeine, but the frontend now creates the backend actor directly from `env.json` and no longer uses Caffeine's frontend identity/actor runtime.
 
 ## Current Build Targets
 
@@ -83,11 +83,11 @@ Still required before production:
 - Replace placeholder `src/frontend/env.json` values with the deployed backend canister ID and host.
 - Decide the final deployment path for the frontend assets.
 - Add or verify a deployment manifest for the chosen hosting platform.
-- Replace Caffeine-specific actor/identity runtime only after the current scoring and evaluation flow is stable.
+- Replace the remaining Caffeine-specific bindgen/outcall dependencies only after the current deployment path is verified.
 
 ## Known Caffeine-Specific Runtime Dependencies
 
 - `caffeine-bindgen` generates the frontend actor binding.
 - `caffeineai-http-outcalls` is used by the backend HTTP outcall helper.
 
-These dependencies are not just branding; they are part of the current runtime. Removing them without a tested replacement can break backend calls, authentication, file flows, and evaluation history.
+These dependencies are not visible branding. `caffeine-bindgen` still owns generated frontend bindings, and `caffeineai-http-outcalls` still owns backend HTTP requests. Removing them should be handled as separate tested migrations.

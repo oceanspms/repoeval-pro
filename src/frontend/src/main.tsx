@@ -23,10 +23,16 @@ const queryClient = new QueryClient({
   },
 });
 
+const USE_MOCK_BACKEND = import.meta.env.VITE_USE_MOCK_BACKEND === "true";
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <QueryClientProvider client={queryClient}>
-    <InternetIdentityProvider>
+    {USE_MOCK_BACKEND ? (
       <App />
-    </InternetIdentityProvider>
+    ) : (
+      <InternetIdentityProvider>
+        <App />
+      </InternetIdentityProvider>
+    )}
   </QueryClientProvider>,
 );

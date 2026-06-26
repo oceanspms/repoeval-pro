@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "canisters": {
+    "backend": {
+      "type": "custom",
+      "build": "mops build",
+      "candid": "src/backend/dist/backend.did",
+      "wasm": "src/backend/dist/backend.wasm"
+    },
+    "frontend": {
+      "type": "assets",
+      "dependencies": ["backend"],
+      "source": ["src/frontend/dist"]
+    }
+  },
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:4943",
+      "type": "ephemeral"
+    },
+    "ic": {
+      "providers": ["https://icp-api.io"],
+      "type": "persistent"
+    }
+  }
+}

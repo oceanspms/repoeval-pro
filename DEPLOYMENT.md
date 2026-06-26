@@ -45,11 +45,15 @@ corepack pnpm install --prefer-offline
 corepack pnpm bindgen
 ```
 
+If using DFX, `dfx.json` deploys the backend as a custom canister from the existing Mops build output and the frontend as an assets canister from `src/frontend/dist`.
+
 From `src/frontend/`:
 
 ```powershell
+corepack pnpm env:check
 corepack pnpm typecheck
 corepack pnpm build
+corepack pnpm qa:smoke
 ```
 
 For local UI smoke testing without a deployed backend canister:
@@ -82,7 +86,7 @@ Still required before production:
 
 - Replace placeholder `src/frontend/env.json` values with the deployed backend canister ID and host.
 - Decide the final deployment path for the frontend assets.
-- Add or verify a deployment manifest for the chosen hosting platform.
+- Verify `dfx.json` with an installed DFX toolchain or adapt it for the chosen hosting platform.
 - Replace the remaining Caffeine-specific bindgen/outcall dependencies only after the current deployment path is verified.
 
 ## Known Caffeine-Specific Runtime Dependencies

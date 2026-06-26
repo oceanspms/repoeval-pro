@@ -74,9 +74,16 @@ module {
         // AI log
         (itl.contains(#text "ai log") and signals.has_ai_log) or
         (itl.contains(#text "ai usage") and signals.has_ai_log) or
+        // Tests / validation
+        (itl.contains(#text "test") and (signals.test_count > 0 or pathsContain(signals.file_tree, "test"))) or
+        (itl.contains(#text "spec") and (signals.test_count > 0 or pathsContain(signals.file_tree, "spec"))) or
+        (itl.contains(#text "validation") and signals.error_handler_count > 0) or
         // README / docs
         (itl.contains(#text "readme") and signals.readme_word_count > 50) or
         (itl.contains(#text "documentation") and signals.readme_word_count > 100) or
+        (itl.contains(#text "docs") and signals.readme_word_count > 100) or
+        (itl.contains(#text "setup") and (signals.readme_word_count > 100 or signals.has_setup_script)) or
+        (itl.contains(#text "instruction") and signals.readme_word_count > 100) or
         // Generic: look for keyword in file tree or readme
         containsAny(signals.readme_text, [itl]) or
         pathsContain(signals.file_tree, itl)

@@ -90,11 +90,34 @@ module {
         "authentication",
         "PostgreSQL persistence",
         "tests",
+        "setup instructions",
         "Docker support",
       ];
       core_items = ["REST API server", "authentication", "PostgreSQL persistence"];
-      secondary_items = ["tests", "Docker support"];
+      secondary_items = ["tests", "setup instructions", "Docker support"];
     };
+    let completeBackendSignals : Types.RepoSignals = {
+      baseSignals() with
+      readme_text = "REST API server with authentication, PostgreSQL persistence, tests, setup instructions, and Docker support.";
+      file_tree = ["src/server.ts", "src/routes/users.ts", "tests/server.test.ts", "Dockerfile"];
+      has_backend = true;
+      has_auth = true;
+      has_db_config = true;
+      has_api_routes = true;
+      has_dockerfile = true;
+      readme_word_count = 180;
+      file_count = 24;
+      test_count = 3;
+      error_handler_count = 2;
+    };
+    let (completeBackendMatched, completeBackendMissing) = Scoring.matchRequirements(backendAssignment, completeBackendSignals);
+    failures := failIf(completeBackendMissing.size() != 0, "complete backend fixture should match tests, setup, and Docker requirements", failures);
+    failures := failIf(
+      Scoring.coverageScore(completeBackendMatched, backendAssignment.required_items.size(), 0, 0) != 100,
+      "complete backend fixture coverage should be 100",
+      failures,
+    );
+
     let weakBackendSignals : Types.RepoSignals = {
       baseSignals() with
       readme_text = "Minimal placeholder server.";

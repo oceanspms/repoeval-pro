@@ -22,6 +22,10 @@ mixin (
   evalCounter     : { var value : Nat },
 ) {
 
+  let MAX_REPOS_PER_EVALUATION : Nat = 5;
+  let MAX_ASSIGNMENT_CHARS : Nat = 20_000;
+  let MAX_NOTES_CHARS : Nat = 20_000;
+
   // ── IC HTTP outcall transform ─────────────────────────────────────────────
 
   /// Required transform callback for IC HTTP outcalls (strips response headers).
@@ -211,6 +215,31 @@ mixin (
   func parseAssignment(assignmentText : Text, notes : ?Text) : async Types.ParsedAssignment {
     let _notesIgnoredForRubric = notes;
     parseParsedAssignment("", assignmentText);
+  };
+
+  func truncateText(input : Text, maxChars : Nat) : Text {
+    if (input.size() <= maxChars) return input;
+    let chars = input.toArray();
+    let kept = Array.tabulate(maxChars, func(idx : Nat) : Char { chars[idx] });
+    Text.fromArray(kept);
+  };
+
+  func errorResult(summaryText : Text, redFlags : [Text]) : Types.EvaluationResult {
+    {
+      project_type          = "Error";
+      alignment             = #Low;
+      scores                = { coverage = 0; stackMatch = 0; completeness = 0; depth = 0; docs = 0; demoReadiness = 0; aiUsage = 0 };
+      final_score           = 0;
+      missing_items         = [];
+      red_flags             = redFlags;
+      summary               = summaryText;
+      cached                = false;
+      timestamp             = Time.now();
+      recruiter_verdict     = null;
+      applied_instructions  = [];
+      strengths             = [];
+      criticalGaps          = redFlags;
+    };
   };
 
   /// Parse AI response JSON into ParsedAssignment.
@@ -812,10 +841,18 @@ mixin (
   ) : async [Types.EvaluationResult] {
     if (repo_urls.size() == 0) return [];
 
+    let assignmentText = truncateText(assignment_description.trim(#char ' '), MAX_ASSIGNMENT_CHARS);
+    if (assignmentText.size() < 10) {
+      return [errorResult(
+        "Evaluation failed — assignment description is missing or too short.",
+        ["Assignment description is missing or too short"],
+      )];
+    };
+
     // Resolve raw notes text once
     let rawNotesText : Text = switch optional_notes {
       case null "";
-      case (?n) n;
+      case (?n) truncateText(n, MAX_NOTES_CHARS);
     };
 
     // Parse instructions from notes to get weight overrides
@@ -827,21 +864,21 @@ mixin (
     } else {
       // Expand any embedded URLs in notes (Google Docs, GitHub repos, Notion pages)
       if (rawNotesText.size() > 0) {
-        await expandUrlsInNotes(rawNotesText);
+        truncateText(await expandUrlsInNotes(rawNotesText), MAX_NOTES_CHARS);
       } else {
         "";
       };
     };
 
     // Assignment parsing is based only on the assignment; notes are evidence.
-    let combinedAssignment = assignment_description;
+    let combinedAssignment = assignmentText;
     let ak = Scoring.assignmentCacheKey(combinedAssignment);
 
-    // Parse assignment once for all repos (AI call, cached)
+    // Parse assignment once for all repos (deterministic, cached)
     let parsed : Types.ParsedAssignment = switch (assignmentCache.get(ak)) {
       case (?p) p;
       case null {
-        let p = await parseAssignment(assignment_description, optional_notes);
+        let p = await parseAssignment(assignmentText, optional_notes);
         assignmentCache.add(ak, p);
         p;
       };
@@ -849,37 +886,33 @@ mixin (
 
     // Evaluate each repo independently
     var results : [Types.EvaluationResult] = [];
+    var processed : Nat = 0;
     for (repo_url in repo_urls.values()) {
       let trimmed = repo_url.trim(#char ' ');
-      if (trimmed.size() == 0) {
+      if (trimmed.size() == 0 or processed >= MAX_REPOS_PER_EVALUATION) {
         // skip blank entries
       } else {
+        processed += 1;
         // Cache key includes notes hash so different notes with same repo+assignment → fresh evaluation
         let notesHash = Scoring.hashText(notesText);
         let ck = Scoring.cacheKey(trimmed, combinedAssignment # "|notes:" # notesHash);
         let result = try {
-          await evaluateSingleRepo(trimmed, parsed, notesText, overrides, ck, assignment_description);
+          await evaluateSingleRepo(trimmed, parsed, notesText, overrides, ck, assignmentText);
         } catch (e) {
-          // On error for this repo, return a zero-score error result
-          let errorResult : Types.EvaluationResult = {
-            project_type          = "Error";
-            alignment             = #Low;
-            scores                = { coverage = 0; stackMatch = 0; completeness = 0; depth = 0; docs = 0; demoReadiness = 0; aiUsage = 0 };
-            final_score           = 0;
-            missing_items         = [];
-            red_flags             = ["Evaluation failed for this repo URL"];
-            summary               = "Evaluation failed — could not fetch or process this repository.";
-            cached                = false;
-            timestamp             = Time.now();
-            recruiter_verdict     = null;
-            applied_instructions  = [];
-            strengths             = [];
-            criticalGaps          = [];
-          };
-          errorResult;
+          errorResult(
+            "Evaluation failed — could not fetch or process this repository.",
+            ["Evaluation failed for this repo URL"],
+          );
         };
         results := results.concat([result]);
       };
+    };
+
+    if (results.size() == 0) {
+      return [errorResult(
+        "Evaluation failed — no valid repository URLs were provided.",
+        ["No valid repository URLs were provided"],
+      )];
     };
 
     results;

@@ -33,7 +33,18 @@ export interface UseFileExtraction {
 const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
 // Accept all these extensions — validate by name only, never by MIME type.
 // Edge PDFs arrive as application/octet-stream so MIME checks must be skipped.
-const ACCEPTED_EXTS = ["pdf", "docx", "doc", "txt"] as const;
+const ACCEPTED_EXTS = [
+  "pdf",
+  "docx",
+  "doc",
+  "txt",
+  "md",
+  "csv",
+  "xls",
+  "xlsx",
+  "zip",
+  "rar",
+] as const;
 type AcceptedExt = (typeof ACCEPTED_EXTS)[number];
 
 const ACTOR_READY_TIMEOUT_MS = 15_000;
@@ -120,7 +131,8 @@ export function useFileExtraction(): UseFileExtraction {
         ...s,
         file,
         status: "error",
-        error: "Unsupported file type. Please use .pdf, .doc, .docx, or .txt",
+        error:
+          "Unsupported file type. Please use PDF, DOC/DOCX, TXT/MD/CSV, XLS/XLSX, ZIP, or paste manually.",
         extractedText: "",
         isExtracting: false,
         showCleanButton: false,

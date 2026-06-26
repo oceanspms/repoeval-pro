@@ -207,14 +207,10 @@ mixin (
 
   /// Call OpenAI-compatible API to parse an assignment into { role, required_items }.
   /// Temperature MUST be 0 for determinism.
-  /// Notes text is appended to assignment text before parsing so requirements
-  /// in notes are included in the structured checklist.
+  /// Notes are used later as evidence; the assignment text alone defines the rubric.
   func parseAssignment(assignmentText : Text, notes : ?Text) : async Types.ParsedAssignment {
-    let notesSection = switch notes {
-      case null "";
-      case (?n) "\n\nAdditional context and notes:\n" # n;
-    };
-    let combinedText = assignmentText # notesSection;
+    let _notesIgnoredForRubric = notes;
+    let combinedText = assignmentText;
     let prompt = "You are a hiring assignment classifier. Given the following hiring assignment, respond with ONLY a JSON object (no markdown, no explanation) in this exact format:\n{\"role\":\"<Frontend|Backend|Fullstack|DevOps|QA|ML|Mobile>\",\"required_items\":[\"item1\",\"item2\",...],\"core_items\":[\"item1\",...],\"secondary_items\":[\"item1\",...]}\n\nCRITICAL role detection rules:\n- If the assignment mentions React, Vue, Angular, HTML, CSS, UI, UX, components, Tailwind, styled-components, Next.js, Gatsby, Svelte, responsive design, web design, frontend, or front-end WITHOUT backend-specific terms (Express, Django, FastAPI, Node server, REST API, database, PostgreSQL, MongoDB, microservices, GraphQL server), classify as Frontend.\n- If it mentions both frontend AND backend technologies, classify as Fullstack.\n- If it mentions DevOps tools (Docker, Kubernetes, Terraform, CI/CD, pipelines, AWS, GCP, Azure) primarily, classify as DevOps.\n- If it is backend-only (APIs, databases, server logic, no UI), classify as Backend.\n- Reply with exactly one of: Frontend, Backend, Fullstack, DevOps, QA, ML, Mobile\n\nFor each requirement, classify as core (must-have, fundamental to the assignment) or secondary (optional, nice-to-have). All items must also appear in required_items. Return: {role, required_items, core_items, secondary_items}\n\nAssignment:\n" # combinedText;
 
     let body = "{\"model\":\"gpt-4o-mini\",\"temperature\":0,\"messages\":[{\"role\":\"user\",\"content\":" # jsonString(prompt) # "}]}";
@@ -252,7 +248,24 @@ mixin (
     let role : Text = switch (extractJsonStringField(json, "role")) {
       case (?r) {
         let rl = r.toLower();
-        if      (rl.contains(#text "devops"))    "DevOps"
+        let al = assignmentText.toLower();
+        let strongFrontend =
+          al.contains(#text "react") or al.contains(#text "vue") or al.contains(#text "angular") or
+          al.contains(#text "svelte") or al.contains(#text "tailwind") or al.contains(#text "html/css") or
+          al.contains(#text "ui/ux") or al.contains(#text "component") or
+          al.contains(#text "responsive") or al.contains(#text "web design") or
+          al.contains(#text "frontend") or al.contains(#text "front-end") or
+          al.contains(#text "landing page") or al.contains(#text "user interface") or
+          al.contains(#text "figma");
+        let strongBackend =
+          al.contains(#text "express") or al.contains(#text "django") or al.contains(#text "fastapi") or
+          al.contains(#text "postgresql") or al.contains(#text "mongodb") or
+          al.contains(#text "node.js server") or al.contains(#text "rest api server") or
+          al.contains(#text "graphql server") or al.contains(#text "database schema") or
+          al.contains(#text "backend");
+        if (strongFrontend and not strongBackend) "Frontend"
+        else if (strongFrontend and strongBackend) "Fullstack"
+        else if (rl.contains(#text "devops"))    "DevOps"
         else if (rl.contains(#text "fullstack") or rl.contains(#text "full")) "Fullstack"
         else if (rl.contains(#text "backend"))   "Backend"
         else if (rl.contains(#text "frontend"))  "Frontend"
@@ -391,8 +404,49 @@ mixin (
       if (seen.any(func(s) { s == item })) false
       else { seen := seen.concat([item]); true }
     });
+    let enriched = if (deduped.size() < 2) {
+      var merged = deduped;
+      for (item in inferRequirementsFromKeywords(text).values()) {
+        if (not merged.any(func(existing) { existing == item })) {
+          merged := merged.concat([item]);
+        };
+      };
+      merged;
+    } else {
+      deduped;
+    };
     // Cap at 30 items to prevent runaway lists
-    deduped.sliceToArray(0, Nat.min(30, deduped.size()));
+    enriched.sliceToArray(0, Nat.min(30, enriched.size()));
+  };
+
+  func inferRequirementsFromKeywords(text : Text) : [Text] {
+    let al = text.toLower();
+    var out : [Text] = [];
+    func add(reqLabel : Text) {
+      if (not out.any(func(existing) { existing == reqLabel })) {
+        out := out.concat([reqLabel]);
+      };
+    };
+    if (al.contains(#text "react") or al.contains(#text "vue") or al.contains(#text "angular") or
+        al.contains(#text "frontend") or al.contains(#text "front-end") or al.contains(#text "ui") or
+        al.contains(#text "component")) add("Build the required frontend user interface");
+    if (al.contains(#text "responsive") or al.contains(#text "mobile friendly") or al.contains(#text "mobile-first")) add("Implement responsive layout and mobile-friendly UI");
+    if (al.contains(#text "api") or al.contains(#text "backend") or al.contains(#text "server") or
+        al.contains(#text "endpoint")) add("Implement required backend or API functionality");
+    if (al.contains(#text "auth") or al.contains(#text "login") or al.contains(#text "jwt") or
+        al.contains(#text "oauth")) add("Implement authentication flow");
+    if (al.contains(#text "database") or al.contains(#text "postgres") or al.contains(#text "mongodb") or
+        al.contains(#text "mysql") or al.contains(#text "redis")) add("Implement required data persistence layer");
+    if (al.contains(#text "test") or al.contains(#text "testing") or al.contains(#text "unit test")) add("Include tests for important flows");
+    if (al.contains(#text "docker") or al.contains(#text "container")) add("Provide Docker or container setup");
+    if (al.contains(#text "ci") or al.contains(#text "pipeline") or al.contains(#text "github action")) add("Provide CI pipeline configuration");
+    if (al.contains(#text "readme") or al.contains(#text "documentation") or al.contains(#text "setup")) add("Document setup and usage instructions");
+    if (al.contains(#text "demo") or al.contains(#text "deploy") or al.contains(#text "vercel") or
+        al.contains(#text "netlify") or al.contains(#text "hosted")) add("Provide a runnable demo or deployment");
+    if (out.size() == 0 and text.trim(#char ' ').size() >= 20) {
+      add(text.trim(#char ' '));
+    };
+    out;
   };
 
   /// Strip common list prefixes from a line.
@@ -659,7 +713,15 @@ mixin (
         has_demo_link           = signals.has_demo_link           or notesSignals.has_demo_link;
         has_working_demo_link   = signals.has_working_demo_link;  // HTTP verification applies to repo README only
         demo_url                = signals.demo_url;                // keep repo's extracted URL
-        has_ai_log              = signals.has_ai_log              or notesSignals.has_ai_log;
+        has_ai_log              = signals.has_ai_log              or notesSignals.has_ai_log or
+          notesText.toLower().contains(#text "prompt_log") or
+          notesText.toLower().contains(#text "ai_log") or
+          notesText.toLower().contains(#text "chatgpt") or
+          notesText.toLower().contains(#text "gpt_log") or
+          notesText.toLower().contains(#text "openai.com/share") or
+          notesText.toLower().contains(#text "chat.openai") or
+          notesText.toLower().contains(#text "claude.ai") or
+          notesText.toLower().contains(#text "gemini");
         readme_word_count   = signals.readme_word_count;    // keep original readme word count
         todo_count          = signals.todo_count;           // keep repo value (not from notes)
         has_env_example     = signals.has_env_example   or notesSignals.has_env_example;
@@ -708,7 +770,7 @@ mixin (
 
     let rawScores : Types.Scores = {
       coverage      = Scoring.coverageScore(matched, total, coreMissing, secondaryMissing);
-      stackMatch    = Scoring.stackMatchScore(mergedSignals, parsed.required_items);
+      stackMatch    = Scoring.stackMatchScore(mergedSignals, parsed);
       completeness  = Scoring.completenessScore(mergedSignals);
       depth         = Scoring.depthScore(mergedSignals, mergedSignals.file_count);
       docs          = Scoring.docsScore(mergedSignals);
@@ -719,7 +781,7 @@ mixin (
     // Apply weight overrides (per-evaluation, does not modify core engine)
     let scores = Scoring.applyWeightOverrides(rawScores, overrides);
 
-    let fs        = Scoring.finalScore(scores, overrides);
+    let fs        = Scoring.finalScore(scores);
     let alignment = Scoring.alignmentFromScore(fs);
     let redFlags  = Scoring.buildRedFlags(scores, parsed, mergedSignals);
     let summary   = Scoring.buildSummary(scores, fs, missing, redFlags, parsed, mergedSignals);
@@ -799,11 +861,8 @@ mixin (
       };
     };
 
-    // Cache key for assignment parsing includes notes so different notes = different parse
-    let combinedAssignment = assignment_description # (switch optional_notes {
-      case null "";
-      case (?n) "\n" # n;
-    });
+    // Assignment parsing is based only on the assignment; notes are evidence.
+    let combinedAssignment = assignment_description;
     let ak = Scoring.assignmentCacheKey(combinedAssignment);
 
     // Parse assignment once for all repos (AI call, cached)

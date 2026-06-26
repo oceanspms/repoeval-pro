@@ -21,12 +21,12 @@ function formatDate(ts: bigint): string {
   });
 }
 
-/** Color-coded score badge: green ≥8.5, yellow ≥6.0, red <6.0 */
+/** Color-coded score badge on the backend's 0-100 scale. */
 function ScoreBadge({ score }: { score: number }) {
   const cls =
-    score >= 8.5
+    score >= 80
       ? "bg-[oklch(var(--chart-2)/0.15)] text-[oklch(var(--chart-2))] border-[oklch(var(--chart-2)/0.3)]"
-      : score >= 6.0
+      : score >= 60
         ? "bg-[oklch(var(--chart-4)/0.15)] text-[oklch(var(--chart-4))] border-[oklch(var(--chart-4)/0.3)]"
         : "bg-[oklch(var(--chart-1)/0.15)] text-[oklch(var(--chart-1))] border-[oklch(var(--chart-1)/0.3)]";
 
@@ -37,7 +37,7 @@ function ScoreBadge({ score }: { score: number }) {
         cls,
       ].join(" ")}
     >
-      {score}/10
+      {score}/100
     </span>
   );
 }
@@ -135,12 +135,12 @@ function HistoryRow({
   // Inline verdict for expanded row — compact 1-line summary
   const verdict = record.result.recruiter_verdict;
   const verdictEmoji =
-    verdict?.emoji ?? (finalScore > 8.5 ? "✅" : finalScore >= 6 ? "⚠️" : "❌");
+    verdict?.emoji ?? (finalScore >= 80 ? "✅" : finalScore >= 60 ? "⚠️" : "❌");
   const verdictText =
     verdict?.verdict ??
-    (finalScore > 8.5
+    (finalScore >= 80
       ? "Highly Recommended"
-      : finalScore >= 6
+      : finalScore >= 60
         ? "Proceed with Caution"
         : "Not Recommended");
   const verdictWhy = verdict?.why ?? "";

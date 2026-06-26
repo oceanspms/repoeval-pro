@@ -140,6 +140,29 @@ module {
     false;
   };
 
+  func looksLikePdfStructure(raw : Text) : Bool {
+    let lower = raw.toLower();
+    lower.contains(#text "/type") or lower.contains(#text "/catalog") or
+    lower.contains(#text "/pages") or lower.contains(#text "/font") or
+    lower.contains(#text "/flatedecode") or lower.contains(#text " obj ") or
+    lower.contains(#text " stream ") or lower.contains(#text "xref") or
+    lower.contains(#text "startxref");
+  };
+
+  func hasEnoughReadableText(raw : Text) : Bool {
+    var letters : Nat = 0;
+    var spaces : Nat = 0;
+    for (c in raw.toIter()) {
+      let code = c.toNat32().toNat();
+      if ((code >= 65 and code <= 90) or (code >= 97 and code <= 122)) {
+        letters += 1;
+      } else if (code == 32 or code == 10 or code == 9) {
+        spaces += 1;
+      };
+    };
+    raw.size() >= 40 and letters >= 25 and spaces >= 4;
+  };
+
   // ── TXT ──────────────────────────────────────────────────────────────────────
 
   func extractTxt(bytes : Blob) : { #ok : { text : Text; is_clean : Bool }; #err : Text } {
@@ -264,13 +287,17 @@ module {
       // Strip any segment containing these markers so only human-readable text survives.
       let fbCleaned = stripPdfBinaryMarkers(cleanExtractedText(fallback));
       let fn = normalize(fbCleaned);
-      if (fn.size() >= 20) {
+      if (hasEnoughReadableText(fn) and not looksLikePdfStructure(fn)) {
         return #ok({ text = fn; is_clean = not hasJunkContent(fn) });
       };
       return #err("PDF content could not be extracted — the document may use compressed streams. Please copy and paste the assignment text manually.");
     };
 
-    #ok({ text = n; is_clean = not hasJunkContent(n) });
+    if (hasEnoughReadableText(n) and not looksLikePdfStructure(n)) {
+      #ok({ text = n; is_clean = not hasJunkContent(n) });
+    } else {
+      #err("PDF content could not be extracted cleanly. Please copy and paste the assignment text manually.");
+    };
   };
 
   // ── PDF binary marker stripper ─────────────────────────────────────────────
@@ -561,6 +588,8 @@ module {
 
     var out = "";
     var i   = 0;
+    var skippedCompressed : Nat = 0;
+    var skippedBinary : Nat = 0;
     let MAX_ENTRY : Nat = 512_000; // 500KB per entry
 
     while (i + 30 < len) {
@@ -648,32 +677,16 @@ module {
               case (#err(_)) {}; // skip silently
             };
           } else if (isPdfEntry or isDocxEntry or isXlsxEntry) {
-            // Deflate-compressed binary — skip gracefully (cannot decompress natively)
+            skippedCompressed += 1;
           } else {
             // Text / code file — read as UTF-8 (stored) or best-effort ASCII (deflated)
-            let shouldRead = method == 0 or (method == 8 and uncompSz < MAX_ENTRY and compSz < MAX_ENTRY);
+            let shouldRead = method == 0 and compSz < MAX_ENTRY;
             if (shouldRead) {
               let fileBytes : [var Nat8] = Array.repeat(0 : Nat8, compSz).toVarArray();
               var k = 0;
               while (k < compSz) { fileBytes[k] := arr[dataStart + k]; k += 1 };
               let blob = Blob.fromArray(fileBytes.toArray());
-              let text : ?Text = if (method == 0) {
-                blob.decodeUtf8();
-              } else {
-                // Best-effort: extract printable ASCII from raw deflate bytes.
-                // Keep content only if >60% of characters are printable ASCII.
-                var asciiOut = "";
-                var asciiCount = 0;
-                for (b in fileBytes.vals()) {
-                  if (b >= 32 and b <= 126) {
-                    asciiOut #= b2t(b);
-                    asciiCount += 1;
-                  } else if (b == 10 or b == 13) {
-                    asciiOut #= "\n";
-                  };
-                };
-                if (asciiCount > 50) ?asciiOut else null;
-              };
+              let text : ?Text = blob.decodeUtf8();
               switch (text) {
                 case (?t) {
                   var printable = 0;
@@ -689,6 +702,10 @@ module {
                 };
                 case null {};
               };
+            } else if (method == 8) {
+              skippedCompressed += 1;
+            } else {
+              skippedBinary += 1;
             };
           };
         };
@@ -703,7 +720,13 @@ module {
     let cleaned = cleanExtractedText(out);
     let n = normalizeMax(cleaned, MAX_NOTES);
     if (n.size() == 0) {
-      #err("ZIP archive contained no readable text content. Try extracting the ZIP and uploading files individually.")
+      if (skippedCompressed > 0) {
+        #err("ZIP archive entries are compressed. This backend cannot decompress ZIP contents natively; extract the ZIP locally and upload the relevant files individually.")
+      } else if (skippedBinary > 0) {
+        #err("ZIP archive contained no readable text entries. Upload a PDF, DOCX, TXT, MD, CSV, XLSX, or source file directly.")
+      } else {
+        #err("ZIP archive contained no readable text content. Try extracting the ZIP and uploading files individually.")
+      }
     } else {
       #ok({ text = n; is_clean = not hasJunkContent(n) })
     };
@@ -750,7 +773,7 @@ module {
     };
 
     let lower = fileName.toLower();
-    let rawResult = if (lower.endsWith(#text ".txt")) {
+    let rawResult = if (lower.endsWith(#text ".txt") or lower.endsWith(#text ".md") or lower.endsWith(#text ".csv")) {
       extractTxt(fileBytes);
     } else if (lower.endsWith(#text ".pdf")) {
       extractPdf(fileBytes);
@@ -762,8 +785,14 @@ module {
         case (#ok(r)) #ok(r);
         case (#err(_)) #err("Legacy .doc files are not fully supported. Please save as .docx or paste text manually.");
       };
+    } else if (lower.endsWith(#text ".xlsx") or lower.endsWith(#text ".xls")) {
+      extractXlsx(fileBytes);
+    } else if (lower.endsWith(#text ".zip")) {
+      extractZip(fileBytes);
+    } else if (lower.endsWith(#text ".rar")) {
+      #err("RAR archive detected. RAR decompression is not supported natively. Please re-upload as a ZIP file or paste the assignment text manually.");
     } else {
-      #err("Unsupported file type. Please upload a .pdf, .docx, or .txt file.");
+      extractGeneric(fileBytes);
     };
 
     // Secondary clean pass: if result is ok but is_clean=false, attempt to recover readable text

@@ -1,12 +1,12 @@
 {
-  "name": "@caffeine/template-frontend",
+  "name": "repoeval-pro-frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && pnpm copy:env",
-    "copy:env": "cp env.json dist/",
+    "build": "vite build && npm run copy:env",
+    "copy:env": "node -e \"require('fs').copyFileSync('env.json', 'dist/env.json')\"",
     "typecheck": "tsc --noEmit",
     "check": "biome check src",
     "fix": "biome check --write src"

@@ -5,3 +5,4 @@ dist/
 .platform/
 .pnpm-store/
 .cache/
+.wsl/

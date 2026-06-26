@@ -238,29 +238,29 @@ export function generateCandidateBrief(record: EvaluationRecord): void {
 
   // Determine verdict
   const verdict = r.recruiter_verdict ?? {
-    emoji: finalScore > 8.5 ? "✅" : finalScore >= 6 ? "⚠️" : "❌",
+    emoji: finalScore >= 80 ? "✅" : finalScore >= 60 ? "⚠️" : "❌",
     verdict:
-      finalScore > 8.5
+      finalScore >= 80
         ? ("pass" as import("../types").Variant_fail_pass_caution)
-        : finalScore >= 6
+        : finalScore >= 60
           ? ("caution" as import("../types").Variant_fail_pass_caution)
           : ("fail" as import("../types").Variant_fail_pass_caution),
     why:
-      finalScore > 8.5
+      finalScore >= 80
         ? "Strong alignment with requirements and solid technical execution across all evaluated dimensions."
-        : finalScore >= 6
+        : finalScore >= 60
           ? "Partial alignment — key areas are covered but notable gaps remain."
           : "Does not adequately meet the assignment requirements.",
-    technical_debt: finalScore > 8.5 ? "Production Ready" : "Prototype Grade",
+    technical_debt: finalScore >= 80 ? "Production Ready" : "Prototype Grade",
     strengths: [],
     criticalGaps: [],
   };
 
   // Score color
   const scoreColor =
-    finalScore >= 8.5 ? "#166534" : finalScore >= 6 ? "#854d0e" : "#991b1b";
+    finalScore >= 80 ? "#166534" : finalScore >= 60 ? "#854d0e" : "#991b1b";
   const scoreBg =
-    finalScore >= 8.5 ? "#dcfce7" : finalScore >= 6 ? "#fef9c3" : "#fee2e2";
+    finalScore >= 80 ? "#dcfce7" : finalScore >= 60 ? "#fef9c3" : "#fee2e2";
 
   // Verdict color
   const verdictColor =
@@ -302,7 +302,7 @@ export function generateCandidateBrief(record: EvaluationRecord): void {
       (d) => `
     <tr>
       <td style="padding:6px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;">${d.label}</td>
-      <td style="padding:6px 12px;font-size:13px;font-weight:600;text-align:right;color:${d.value >= 7 ? "#166534" : d.value >= 4 ? "#854d0e" : "#991b1b"};border-bottom:1px solid #f3f4f6;">${d.value}/10</td>
+      <td style="padding:6px 12px;font-size:13px;font-weight:600;text-align:right;color:${d.value >= 70 ? "#166534" : d.value >= 40 ? "#854d0e" : "#991b1b"};border-bottom:1px solid #f3f4f6;">${d.value}/100</td>
     </tr>`,
     )
     .join("");
@@ -310,14 +310,14 @@ export function generateCandidateBrief(record: EvaluationRecord): void {
   const strengthItems = strengths
     .map(
       (s) =>
-        `<li style="margin-bottom:4px;font-size:13px;color:#374151;">✓ <strong>${s.label}</strong> — ${s.value}/10</li>`,
+        `<li style="margin-bottom:4px;font-size:13px;color:#374151;">✓ <strong>${s.label}</strong> — ${s.value}/100</li>`,
     )
     .join("");
 
   const weaknessItems = weaknesses
     .map(
       (w) =>
-        `<li style="margin-bottom:4px;font-size:13px;color:#374151;">✗ <strong>${w.label}</strong> — ${w.value}/10</li>`,
+        `<li style="margin-bottom:4px;font-size:13px;color:#374151;">✗ <strong>${w.label}</strong> — ${w.value}/100</li>`,
     )
     .join("");
 
@@ -366,9 +366,9 @@ export function generateCandidateBrief(record: EvaluationRecord): void {
       <div style="display:flex;align-items:center;justify-content:space-between;background:${scoreBg};border:1px solid ${scoreColor}33;border-radius:8px;padding:16px 20px;">
         <div>
           <p style="color:#6b7280;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;margin:0 0 2px;">Final Score</p>
-          <p style="color:#9ca3af;font-size:12px;margin:0;">Average of 7 dimensions</p>
+          <p style="color:#9ca3af;font-size:12px;margin:0;">Weighted evaluation score</p>
         </div>
-        <span style="font-size:40px;font-weight:800;color:${scoreColor};font-variant-numeric:tabular-nums;">${finalScore}<span style="font-size:20px;color:#9ca3af;font-weight:400;">/10</span></span>
+        <span style="font-size:40px;font-weight:800;color:${scoreColor};font-variant-numeric:tabular-nums;">${finalScore}<span style="font-size:20px;color:#9ca3af;font-weight:400;">/100</span></span>
       </div>
 
       <!-- Verdict -->

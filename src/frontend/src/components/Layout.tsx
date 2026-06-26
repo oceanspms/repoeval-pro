@@ -35,8 +35,6 @@ export function Layout({ children, activeTab, onTabChange }: LayoutProps) {
   const { data: cacheStats } = useCacheStats();
 
   const year = new Date().getFullYear();
-  const hostname = encodeURIComponent(window.location.hostname);
-
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       {/* Header */}
@@ -111,12 +109,10 @@ export function Layout({ children, activeTab, onTabChange }: LayoutProps) {
           <span className="text-xs text-muted-foreground">
             © {year}.{" "}
             <a
-              href={`https://caffeine.ai?utm_source=caffeine-footer&utm_medium=referral&utm_content=${hostname}`}
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/"
               className="hover:text-accent transition-smooth"
             >
-              Built with love using caffeine.ai
+              RepoEval Pro
             </a>
           </span>
 

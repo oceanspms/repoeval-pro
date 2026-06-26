@@ -489,7 +489,7 @@ export function ResultReport({ result }: ResultReportProps) {
             Final Score
           </p>
           <p className="text-xs text-muted-foreground font-mono">
-            Weighted evaluation score (6 core dimensions + prompt log bonus)
+            Weighted evaluation score across assignment coverage, implementation quality, demo/docs, and AI evidence
           </p>
         </div>
         <div className="flex items-baseline gap-1">

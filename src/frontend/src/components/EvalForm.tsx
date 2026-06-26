@@ -18,7 +18,7 @@ import type { UseNotesExtraction } from "../hooks/useNotesExtraction";
 import type { EvaluationFormData } from "../types";
 
 const GITHUB_RE = /^https?:\/\/(www\.)?github\.com\/[^/\s]+\/[^/\s]+/;
-const ACCEPTED_ASSIGNMENT_TYPES = ".pdf,.doc,.docx,.txt";
+const ACCEPTED_ASSIGNMENT_TYPES = ".pdf,.doc,.docx,.txt,.md,.csv,.xls,.xlsx,.zip,.rar";
 // Notes accept everything
 const ACCEPTED_NOTES_TYPES = "*";
 let idCounter = 0;

@@ -1,10 +1,9 @@
-import { useActor } from "@caffeineai/core-infrastructure";
 import { useQuery } from "@tanstack/react-query";
-import { createActor } from "../backend";
 import type { CacheStats } from "../types";
+import { useBackendActor } from "./useBackendActor";
 
 export function useCacheStats() {
-  const { actor, isFetching } = useActor(createActor);
+  const { actor, isFetching } = useBackendActor();
 
   return useQuery<CacheStats>({
     queryKey: ["cacheStats"],

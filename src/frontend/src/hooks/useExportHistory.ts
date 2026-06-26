@@ -1,7 +1,5 @@
-import { useActor } from "@caffeineai/core-infrastructure";
 import { useState } from "react";
 import { toast } from "sonner";
-import { createActor } from "../backend";
 import {
   exportFullSummary,
   exportRoleReport,
@@ -9,6 +7,7 @@ import {
   normalizeRepoUrl,
 } from "../lib/exportUtils";
 import type { EvaluationRecord } from "../types";
+import { useBackendActor } from "./useBackendActor";
 
 function normalizeRecord(r: {
   id: string;
@@ -22,7 +21,7 @@ function normalizeRecord(r: {
 }
 
 export function useExportHistory() {
-  const { actor, isFetching } = useActor(createActor);
+  const { actor, isFetching } = useBackendActor();
   const [isLoading, setIsLoading] = useState(false);
 
   async function downloadFullSummary(): Promise<void> {

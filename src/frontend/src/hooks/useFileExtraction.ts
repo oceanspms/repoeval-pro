@@ -1,6 +1,6 @@
-import { useActor } from "@caffeineai/core-infrastructure";
 import { useCallback, useRef, useState } from "react";
-import { createActor } from "../backend";
+import { type backendInterface } from "../backend";
+import { useBackendActor } from "./useBackendActor";
 
 export type FileUploadStatus =
   | "idle"
@@ -74,7 +74,7 @@ function isStillJunk(text: string): boolean {
 
 async function waitForActorReady(
   actorRef: React.MutableRefObject<
-    ReturnType<typeof createActor> | null | undefined
+    backendInterface | null | undefined
   >,
   isFetchingRef: React.MutableRefObject<boolean>,
 ): Promise<boolean> {
@@ -97,7 +97,7 @@ const EMPTY_STATE: FileExtractionState = {
 };
 
 export function useFileExtraction(): UseFileExtraction {
-  const { actor, isFetching } = useActor(createActor);
+  const { actor, isFetching } = useBackendActor();
 
   const actorRef = useRef(actor);
   const isFetchingRef = useRef(isFetching);

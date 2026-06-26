@@ -1,8 +1,7 @@
-import { useActor } from "@caffeineai/core-infrastructure";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback } from "react";
-import { createActor } from "../backend";
 import type { EvaluationRecord } from "../types";
+import { useBackendActor } from "./useBackendActor";
 
 export const HISTORY_QUERY_KEY = ["history"] as const;
 
@@ -31,7 +30,7 @@ function normalizeRecord(r: {
 }
 
 export function useHistory() {
-  const { actor } = useActor(createActor);
+  const { actor } = useBackendActor();
   const queryClient = useQueryClient();
 
   const query = useQuery<EvaluationRecord[]>({

@@ -52,6 +52,13 @@ corepack pnpm typecheck
 corepack pnpm build
 ```
 
+For local UI smoke testing without a deployed backend canister:
+
+```powershell
+$env:VITE_USE_MOCK_BACKEND="true"
+corepack pnpm dev
+```
+
 From a Linux/WSL shell for the backend:
 
 ```bash

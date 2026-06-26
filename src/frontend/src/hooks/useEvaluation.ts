@@ -1,8 +1,7 @@
-import { useActor } from "@caffeineai/core-infrastructure";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useRef, useState } from "react";
-import { createActor } from "../backend";
 import type { EvaluationFormData, EvaluationResult } from "../types";
+import { useBackendActor } from "./useBackendActor";
 import { HISTORY_QUERY_KEY } from "./useHistory";
 
 interface EvaluationState {
@@ -33,7 +32,7 @@ function makeCacheKey(
 }
 
 export function useEvaluation() {
-  const { actor, isFetching } = useActor(createActor);
+  const { actor, isFetching } = useBackendActor();
   const queryClient = useQueryClient();
   const [state, setState] = useState<EvaluationState>({
     data: null,

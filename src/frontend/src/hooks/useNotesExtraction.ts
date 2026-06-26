@@ -3,9 +3,9 @@
  * link fetching, and manual text. Assembles a single combined notes string
  * to pass to evaluate().
  */
-import { useActor } from "@caffeineai/core-infrastructure";
 import { useCallback, useRef, useState } from "react";
-import { createActor } from "../backend";
+import { type backendInterface } from "../backend";
+import { useBackendActor } from "./useBackendActor";
 import type { FileUploadStatus } from "./useFileExtraction";
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -75,7 +75,7 @@ function buildCombined(
 
 async function waitForActorReady(
   actorRef: React.MutableRefObject<
-    ReturnType<typeof createActor> | null | undefined
+    backendInterface | null | undefined
   >,
   isFetchingRef: React.MutableRefObject<boolean>,
 ): Promise<boolean> {
@@ -101,7 +101,7 @@ const INITIAL_STATE: NotesState = {
 };
 
 export function useNotesExtraction(): UseNotesExtraction {
-  const { actor, isFetching } = useActor(createActor);
+  const { actor, isFetching } = useBackendActor();
   const actorRef = useRef(actor);
   const isFetchingRef = useRef(isFetching);
   actorRef.current = actor;

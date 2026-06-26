@@ -1,12 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useActor } from "@caffeineai/core-infrastructure";
 import { BarChart2, Download, Loader2, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { createActor } from "../backend";
 import { ErrorState } from "../components/ErrorState";
 import { ResultReport } from "../components/ResultReport";
+import { useBackendActor } from "../hooks/useBackendActor";
 import { useExportHistory } from "../hooks/useExportHistory";
 import { useHistory } from "../hooks/useHistory";
 import type { EvaluationRecord } from "../types";
@@ -54,7 +53,7 @@ interface DeleteButtonProps {
 }
 
 function DeleteButton({ recordId, onDeleted }: DeleteButtonProps) {
-  const { actor } = useActor(createActor);
+  const { actor } = useBackendActor();
   const [confirm, setConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 

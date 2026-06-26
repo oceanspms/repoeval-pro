@@ -92,15 +92,16 @@ module {
   };
 
   /// Compute coverage score (0-100) from matched vs total required items.
-  public func coverageScore(_matched : Nat, total : Nat, coreMissing : Nat, secondaryMissing : Nat) : Nat {
+  public func coverageScore(matched : Nat, total : Nat, coreMissing : Nat, secondaryMissing : Nat) : Nat {
     // Safety: if the parser returned no requirements (should not happen after parse fix),
     // return 0. Returning 100 for 0/0 is false inflation.
     if (total == 0) return 0;
-    var score : Int = 100;
-    score -= (coreMissing * 20 : Int);
-    score -= (secondaryMissing * 5 : Int);
-    if (score < 0) return 0;
-    score.toNat();
+    let ratioScore = Nat.min((matched * 100) / total, 100);
+    var severityScore : Int = 100;
+    severityScore -= (coreMissing * 20 : Int);
+    severityScore -= (secondaryMissing * 5 : Int);
+    let boundedSeverity = if (severityScore < 0) 0 else severityScore.toNat();
+    Nat.min(ratioScore, boundedSeverity);
   };
 
   /// Role-based: DevOps needs infra, Backend needs server/api, Fullstack needs both.

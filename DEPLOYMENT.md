@@ -87,7 +87,6 @@ Still required before production:
 
 ## Known Caffeine-Specific Runtime Dependencies
 
-- `@caffeineai/core-infrastructure` is used by the frontend for `InternetIdentityProvider` and `useActor`.
 - `caffeine-bindgen` generates the frontend actor binding.
 - `caffeineai-http-outcalls` is used by the backend HTTP outcall helper.
 

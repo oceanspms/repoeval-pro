@@ -203,42 +203,14 @@ mixin (
     result;
   };
 
-  // ── internal: AI assignment parsing ──────────────────────────────────────
+  // ── internal: deterministic assignment parsing ───────────────────────────
 
-  /// Call OpenAI-compatible API to parse an assignment into { role, required_items }.
-  /// Temperature MUST be 0 for determinism.
+  /// Parse an assignment into { role, required_items } using deterministic heuristics.
+  /// No external LLM/API key is required; the same assignment text produces the same rubric.
   /// Notes are used later as evidence; the assignment text alone defines the rubric.
   func parseAssignment(assignmentText : Text, notes : ?Text) : async Types.ParsedAssignment {
     let _notesIgnoredForRubric = notes;
-    let combinedText = assignmentText;
-    let prompt = "You are a hiring assignment classifier. Given the following hiring assignment, respond with ONLY a JSON object (no markdown, no explanation) in this exact format:\n{\"role\":\"<Frontend|Backend|Fullstack|DevOps|QA|ML|Mobile>\",\"required_items\":[\"item1\",\"item2\",...],\"core_items\":[\"item1\",...],\"secondary_items\":[\"item1\",...]}\n\nCRITICAL role detection rules:\n- If the assignment mentions React, Vue, Angular, HTML, CSS, UI, UX, components, Tailwind, styled-components, Next.js, Gatsby, Svelte, responsive design, web design, frontend, or front-end WITHOUT backend-specific terms (Express, Django, FastAPI, Node server, REST API, database, PostgreSQL, MongoDB, microservices, GraphQL server), classify as Frontend.\n- If it mentions both frontend AND backend technologies, classify as Fullstack.\n- If it mentions DevOps tools (Docker, Kubernetes, Terraform, CI/CD, pipelines, AWS, GCP, Azure) primarily, classify as DevOps.\n- If it is backend-only (APIs, databases, server logic, no UI), classify as Backend.\n- Reply with exactly one of: Frontend, Backend, Fullstack, DevOps, QA, ML, Mobile\n\nFor each requirement, classify as core (must-have, fundamental to the assignment) or secondary (optional, nice-to-have). All items must also appear in required_items. Return: {role, required_items, core_items, secondary_items}\n\nAssignment:\n" # combinedText;
-
-    let body = "{\"model\":\"gpt-4o-mini\",\"temperature\":0,\"messages\":[{\"role\":\"user\",\"content\":" # jsonString(prompt) # "}]}";
-
-    let raw = try {
-      await OutCall.httpPostRequest(
-        "https://api.openai.com/v1/chat/completions",
-        [
-          { name = "Content-Type";  value = "application/json" },
-          { name = "Authorization"; value = "Bearer sk-placeholder" },
-          { name = "User-Agent";    value = "RepoEval-Pro/1.0" }
-        ],
-        body,
-        transform
-      );
-    } catch _ { "" };
-
-    parseParsedAssignment(raw, assignmentText);
-  };
-
-  /// Minimal JSON string escaper.
-  func jsonString(s : Text) : Text {
-    let escaped = s.replace(#char '\\', "\\\\")
-                   .replace(#text "\"",  "\\\"")
-                   .replace(#char '\n', "\\n")
-                   .replace(#char '\r', "\\r")
-                   .replace(#char '\t', "\\t");
-    "\"" # escaped # "\"";
+    parseParsedAssignment("", assignmentText);
   };
 
   /// Parse AI response JSON into ParsedAssignment.

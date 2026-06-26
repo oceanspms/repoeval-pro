@@ -106,7 +106,7 @@ const sampleResult3: EvaluationResult = {
   applied_instructions: [],
 };
 
-const sampleHistory: EvaluationRecord[] = [
+let mockHistory: EvaluationRecord[] = [
   {
     id: "eval-001",
     result: sampleResult,
@@ -132,6 +132,26 @@ const sampleHistory: EvaluationRecord[] = [
     repo_url: "https://github.com/alex-ml/api-project",
   },
 ];
+
+function ownerFromUrl(repoUrl: string): string {
+  return (
+    repoUrl
+      .replace(/^https?:\/\/(www\.)?github\.com\//, "")
+      .split("/")[0]
+      ?.trim() || "candidate"
+  );
+}
+
+function resultForRepo(repoUrl: string, index: number): EvaluationResult {
+  const source = [sampleResult, sampleResult2, sampleResult3][index % 3];
+  return {
+    ...source,
+    timestamp: BigInt(Date.now()),
+    cached: false,
+    project_type: index % 2 === 0 ? source.project_type : "Frontend",
+    summary: `${source.summary}\n\nMock evaluation for ${repoUrl}.`,
+  };
+}
 
 const roleStats: RoleStats[] = [
   {
@@ -179,17 +199,33 @@ const roleStats: RoleStats[] = [
 ];
 
 export const mockBackend: backendInterface = {
-  getHistory: async () => sampleHistory,
+  getHistory: async () => [...mockHistory],
   getEvaluationById: async (id: string) =>
-    sampleHistory.find((r) => r.id === id)?.result ?? null,
+    mockHistory.find((r) => r.id === id)?.result ?? null,
   clearCache: async () => undefined,
   evaluate: async (
-    _repo_urls: string[],
-    _assignment_description: string,
+    repo_urls: string[],
+    assignment_description: string,
     _optional_notes: string | null,
-  ): Promise<EvaluationResult[]> => [sampleResult],
+  ): Promise<EvaluationResult[]> => {
+    const now = Date.now();
+    const results = repo_urls.map((repoUrl, index) => {
+      const result = resultForRepo(repoUrl, index);
+      const record: EvaluationRecord = {
+        id: `mock-${now}-${index}`,
+        result,
+        owner: ownerFromUrl(repoUrl),
+        assignment_text: assignment_description,
+        timestamp: result.timestamp,
+        repo_url: repoUrl,
+      };
+      mockHistory = [record, ...mockHistory];
+      return result;
+    });
+    return results;
+  },
   getCacheStats: async () => ({
-    entries: BigInt(3),
+    entries: BigInt(mockHistory.length),
     lastHit: true,
   }),
   transform: async (_input) => ({
@@ -204,10 +240,15 @@ export const mockBackend: backendInterface = {
       is_clean: true,
     },
   }),
-  getExportHistory: async () => sampleHistory,
-  getHistoryByRepo: async (_repo_url: string) => sampleHistory.slice(0, 1),
+  getExportHistory: async () => [...mockHistory],
+  getHistoryByRepo: async (repo_url: string) =>
+    mockHistory.filter((record) => record.repo_url === repo_url),
   getRoleStats: async () => roleStats,
-  deleteEvaluation: async (_id: string) => true,
+  deleteEvaluation: async (id: string) => {
+    const before = mockHistory.length;
+    mockHistory = mockHistory.filter((record) => record.id !== id);
+    return mockHistory.length < before;
+  },
   extractNotesFileText: async (_fileBytes: Uint8Array, _fileName: string) => ({
     __kind__: "ok" as const,
     ok: {

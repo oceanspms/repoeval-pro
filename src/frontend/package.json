@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build && npm run copy:env",
     "copy:env": "node -e \"require('fs').copyFileSync('env.json', 'dist/env.json')\"",
+    "qa:smoke": "node scripts/smoke-build.mjs",
     "typecheck": "tsc --noEmit",
     "check": "biome check src",
     "fix": "biome check --write src"

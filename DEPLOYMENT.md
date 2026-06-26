@@ -59,6 +59,8 @@ $env:VITE_USE_MOCK_BACKEND="true"
 corepack pnpm dev
 ```
 
+Mock mode bypasses live actor calls and uses in-memory evaluation/history data. Do not enable it for production builds.
+
 From a Linux/WSL shell for the backend:
 
 ```bash

@@ -158,6 +158,20 @@ module {
     failures := failIf(adjusted.coverage != 40, "coverage override should be applied once", failures);
     failures := failIf(adjustedFinal != 73, "final score should use already-adjusted dimensions only", failures);
 
+    let weightedScores : Types.Scores = {
+      coverage = 40;
+      stackMatch = 80;
+      completeness = 80;
+      depth = 80;
+      docs = 80;
+      demoReadiness = 80;
+      aiUsage = 80;
+    };
+    let identityWeightedFinal = Scoring.finalScoreWithOverrides(weightedScores, { overrides with coverage_mult = 1.0 });
+    let coverageWeightedFinal = Scoring.finalScoreWithOverrides(weightedScores, { overrides with coverage_mult = 2.0 });
+    failures := failIf(identityWeightedFinal != Scoring.finalScore(weightedScores), "identity final-score overrides must preserve the base composite", failures);
+    failures := failIf(coverageWeightedFinal >= identityWeightedFinal, "weighting weak coverage must lower the final score, not inflate coverage", failures);
+
     failures;
   };
 };

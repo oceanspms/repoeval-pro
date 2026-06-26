@@ -641,12 +641,53 @@ module {
   /// Compute final score.
   /// Final weighted score on the same 0-100 scale as the dimensions.
   /// Weights: coverage/stack 35%, completeness/depth 35%, demo/docs 20%, AI evidence 10%.
-  /// Multipliers must already be applied before calling this function.
   public func finalScore(scores : Types.Scores) : Nat {
-    let weighted = ((scores.coverage.toFloat() + scores.stackMatch.toFloat()) / 2.0 * 0.35) +
-                   ((scores.completeness.toFloat() + scores.depth.toFloat()) / 2.0 * 0.35) +
-                   ((scores.demoReadiness.toFloat() + scores.docs.toFloat()) / 2.0 * 0.20) +
-                   (scores.aiUsage.toFloat() * 0.10);
+    weightedFinalScore(scores, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0);
+  };
+
+  /// Compute final score with note-driven weighting.
+  /// Dimension values remain raw evidence scores; only the composite weighting changes.
+  public func finalScoreWithOverrides(scores : Types.Scores, overrides : Types.WeightOverrides) : Nat {
+    weightedFinalScore(
+      scores,
+      overrides.coverage_mult,
+      overrides.stack_mult,
+      overrides.completeness_mult,
+      overrides.depth_mult,
+      overrides.docs_mult,
+      overrides.demoReadiness_mult,
+      overrides.ai_mult,
+    );
+  };
+
+  func weightedFinalScore(
+    scores : Types.Scores,
+    coverageMult : Float,
+    stackMult : Float,
+    completenessMult : Float,
+    depthMult : Float,
+    docsMult : Float,
+    demoReadinessMult : Float,
+    aiMult : Float,
+  ) : Nat {
+    let coverageWeight = 0.175 * Float.max(0.0, coverageMult);
+    let stackWeight = 0.175 * Float.max(0.0, stackMult);
+    let completenessWeight = 0.175 * Float.max(0.0, completenessMult);
+    let depthWeight = 0.175 * Float.max(0.0, depthMult);
+    let demoWeight = 0.10 * Float.max(0.0, demoReadinessMult);
+    let docsWeight = 0.10 * Float.max(0.0, docsMult);
+    let aiWeight = 0.10 * Float.max(0.0, aiMult);
+    let totalWeight = coverageWeight + stackWeight + completenessWeight + depthWeight + demoWeight + docsWeight + aiWeight;
+    if (totalWeight <= 0.0) return 0;
+    let weighted = (
+      scores.coverage.toFloat() * coverageWeight +
+      scores.stackMatch.toFloat() * stackWeight +
+      scores.completeness.toFloat() * completenessWeight +
+      scores.depth.toFloat() * depthWeight +
+      scores.demoReadiness.toFloat() * demoWeight +
+      scores.docs.toFloat() * docsWeight +
+      scores.aiUsage.toFloat() * aiWeight
+    ) / totalWeight;
     let rounded = weighted + 0.5;
     let i = rounded.toInt();
     let result = if (i < 0) 0 else i.toNat();

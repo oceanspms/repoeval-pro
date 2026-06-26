@@ -779,10 +779,10 @@ mixin (
       aiUsage       = Scoring.aiUsageScore(mergedSignals, has_prompt_log, ignore_prompt_log);
     };
 
-    // Apply weight overrides (per-evaluation, does not modify core engine)
-    let scores = Scoring.applyWeightOverrides(rawScores, overrides);
+    // Keep dimension scores as raw evidence; note instructions only reweight the final composite.
+    let scores = rawScores;
 
-    let fs        = Scoring.finalScore(scores);
+    let fs        = Scoring.finalScoreWithOverrides(scores, overrides);
     let alignment = Scoring.alignmentFromScore(fs);
     let redFlags  = Scoring.buildRedFlags(scores, parsed, mergedSignals);
     let summary   = Scoring.buildSummary(scores, fs, missing, redFlags, parsed, mergedSignals);

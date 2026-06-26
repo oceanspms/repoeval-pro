@@ -66,21 +66,38 @@ export function EvalPage({ onNewEvaluation }: EvalPageProps) {
   const [repoEntries, setRepoEntries] = useState<RepoEntry[]>([newEntry()]);
   const [assignment, setAssignment] = useState("");
   const [evaluatedUrls, setEvaluatedUrls] = useState<string[]>([]);
+  const [lastSubmittedForm, setLastSubmittedForm] =
+    useState<EvaluationFormData | null>(null);
   const [hasCompletedEval, setHasCompletedEval] = useState(false);
+
+  const scrollToResults = useCallback(() => {
+    setTimeout(() => {
+      document
+        .getElementById("eval-results")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  }, []);
 
   const handleSubmit = useCallback(
     async (form: EvaluationFormData) => {
+      setLastSubmittedForm(form);
       setEvaluatedUrls(form.repoUrls);
       await evaluate(form);
       setHasCompletedEval(true);
-      setTimeout(() => {
-        document
-          .getElementById("eval-results")
-          ?.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 100);
+      scrollToResults();
     },
-    [evaluate],
+    [evaluate, scrollToResults],
   );
+
+  const handleRetry = useCallback(async () => {
+    if (!lastSubmittedForm) {
+      reset();
+      return;
+    }
+    setEvaluatedUrls(lastSubmittedForm.repoUrls);
+    await evaluate(lastSubmittedForm);
+    scrollToResults();
+  }, [evaluate, lastSubmittedForm, reset, scrollToResults]);
 
   // "New Evaluation" → App bumps the key which unmounts + remounts this entire component
   // so all state resets automatically. We just call onNewEvaluation.
@@ -133,7 +150,9 @@ export function EvalPage({ onNewEvaluation }: EvalPageProps) {
         className="w-full flex flex-col items-center gap-4"
       >
         {loading && <LoadingState />}
-        {error && !loading && <ErrorState message={error} onRetry={reset} />}
+        {error && !loading && (
+          <ErrorState message={error} onRetry={handleRetry} />
+        )}
         {data && !loading && !error && (
           <MultiRepoTabs results={data} repoUrls={evaluatedUrls} />
         )}

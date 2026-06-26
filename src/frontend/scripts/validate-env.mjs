@@ -18,15 +18,42 @@ function usable(value) {
   );
 }
 
+function validUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function validCanisterId(value) {
+  return /^[a-z0-9]+(-[a-z0-9]+)+$/.test(value);
+}
+
 if (!fs.existsSync(envPath)) {
   fail("env.json is missing");
 } else {
-  const config = JSON.parse(fs.readFileSync(envPath, "utf8"));
-  if (!usable(config.backend_host)) {
-    fail("backend_host must be set to the deployed backend host");
+  let config;
+  try {
+    config = JSON.parse(fs.readFileSync(envPath, "utf8"));
+  } catch (error) {
+    fail(`env.json is not valid JSON: ${error.message}`);
+    config = {};
   }
-  if (!usable(config.backend_canister_id)) {
+
+  const backendHost = String(config.backend_host ?? "").trim();
+  const backendCanisterId = String(config.backend_canister_id ?? "").trim();
+
+  if (!usable(backendHost)) {
+    fail("backend_host must be set to the deployed backend host");
+  } else if (!validUrl(backendHost)) {
+    fail("backend_host must be an http(s) URL");
+  }
+  if (!usable(backendCanisterId)) {
     fail("backend_canister_id must be set before production deployment");
+  } else if (!validCanisterId(backendCanisterId)) {
+    fail("backend_canister_id does not look like a valid canister principal");
   }
 }
 

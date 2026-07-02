@@ -6,6 +6,12 @@ const root = process.cwd();
 const network = process.argv.includes("--local") ? "local" : "ic";
 const frontendEnvPath = path.join(root, "src/frontend/env.json");
 const frontendDir = path.join(root, "src/frontend");
+const committedBindingPaths = [
+  path.join(root, "src/frontend/src/backend.ts"),
+  path.join(root, "src/frontend/src/backend.d.ts"),
+  path.join(root, "src/frontend/src/declarations/backend.did.js"),
+  path.join(root, "src/frontend/src/declarations/backend.did.d.ts"),
+];
 const originalFrontendEnv = fs.existsSync(frontendEnvPath)
   ? fs.readFileSync(frontendEnvPath, "utf8")
   : null;
@@ -62,6 +68,26 @@ function restoreFrontendEnv() {
   }
 }
 
+function committedBindingsExist() {
+  return committedBindingPaths.every((bindingPath) => fs.existsSync(bindingPath));
+}
+
+function refreshBindings() {
+  try {
+    run("corepack", ["pnpm", "bindgen"]);
+  } catch (error) {
+    if (!committedBindingsExist()) {
+      throw error;
+    }
+    console.warn(
+      "[deploy] caffeine-bindgen is unavailable; using committed frontend bindings.",
+    );
+    console.warn(
+      "[deploy] If backend Candid changed, regenerate bindings before deploying.",
+    );
+  }
+}
+
 try {
   try {
     capture("dfx", ["--version"]);
@@ -81,7 +107,7 @@ try {
 
   run("mops", ["install"]);
   run("mops", ["build"]);
-  run("corepack", ["pnpm", "bindgen"]);
+  refreshBindings();
   run("dfx", ["deploy", "backend", "--network", network]);
 
   const backendCanisterId = capture("dfx", [
@@ -111,6 +137,9 @@ try {
   if (network === "local") {
     console.log(
       `[deploy] local frontend URL: http://${frontendCanisterId}.localhost:4943`,
+    );
+    console.log(
+      `[deploy] local frontend legacy URL: http://127.0.0.1:4943/?canisterId=${frontendCanisterId}`,
     );
   } else {
     console.log(

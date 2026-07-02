@@ -43,7 +43,6 @@ From the repository root:
 ```powershell
 corepack pnpm install --prefer-offline
 corepack pnpm qa:toolchain
-corepack pnpm bindgen
 corepack pnpm qa:deployment
 ```
 
@@ -65,9 +64,17 @@ Production IC deployment:
 corepack pnpm deploy:ic
 ```
 
-Both scripts build the backend, regenerate frontend bindings, deploy the backend,
-write `src/frontend/env.json` with the backend canister ID, build the frontend,
-deploy frontend assets, and run strict deployment verification.
+Both scripts build the backend, refresh frontend bindings when the Caffeine
+binding generator is available, deploy the backend, write `src/frontend/env.json`
+with the backend canister ID, build the frontend, deploy frontend assets, and run
+strict deployment verification. If `caffeine-bindgen` is unavailable, the scripts
+use the committed generated binding files under `src/frontend/src/`.
+
+Run binding generation manually only after backend Candid/API changes:
+
+```powershell
+corepack pnpm bindgen
+```
 
 Prerequisites:
 

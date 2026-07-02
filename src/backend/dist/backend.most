@@ -63,6 +63,9 @@ type Scores__805501232 =
   };
 type Timestamp__301639476 = Int;
 actor {
+  stable MAX_ASSIGNMENT_CHARS : Nat;
+  stable MAX_NOTES_CHARS : Nat;
+  stable MAX_REPOS_PER_EVALUATION : Nat;
   stable assignmentCache :
     {
       var root :

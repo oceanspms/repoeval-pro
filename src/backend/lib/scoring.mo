@@ -445,9 +445,9 @@ module {
 
     var strongestLabel = "Coverage";
     var strongestScore = scores.coverage;
-    func considerStrong(label : Text, score : Nat) {
+    func considerStrong(dimensionLabel : Text, score : Nat) {
       if (score > strongestScore) {
-        strongestLabel := label;
+        strongestLabel := dimensionLabel;
         strongestScore := score;
       };
     };
@@ -460,9 +460,9 @@ module {
 
     var weakestLabel = "Coverage";
     var weakestScore = scores.coverage;
-    func considerWeak(label : Text, score : Nat) {
+    func considerWeak(dimensionLabel : Text, score : Nat) {
       if (score < weakestScore) {
-        weakestLabel := label;
+        weakestLabel := dimensionLabel;
         weakestScore := score;
       };
     };

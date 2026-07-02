@@ -41,6 +41,7 @@ interface RepoEntry {
 interface EvalFormProps {
   onSubmit: (data: EvaluationFormData) => void;
   isLoading: boolean;
+  backendReady: boolean;
   repoEntries: RepoEntry[];
   setRepoEntries: (v: RepoEntry[]) => void;
   assignment: string;
@@ -155,6 +156,7 @@ function FileStatusPill({
 export function EvalForm({
   onSubmit,
   isLoading,
+  backendReady,
   repoEntries,
   setRepoEntries,
   assignment,
@@ -197,6 +199,7 @@ export function EvalForm({
   // Only block on: no valid repo, empty assignment, active extraction, or
   // assignment file error (since that's the primary content).
   const canSubmit =
+    backendReady &&
     validUrls.length > 0 &&
     effectiveAssignment.trim().length > 0 &&
     !isLoading &&
@@ -277,6 +280,16 @@ export function EvalForm({
       onSubmit={handleSubmit}
       className="w-full max-w-2xl bg-card border border-border rounded-lg p-6 flex flex-col gap-5"
     >
+      {!backendReady && (
+        <div
+          data-ocid="eval.backend_status"
+          className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+        >
+          Backend connection is not ready. Check the deployed canister config in
+          env.json or use mock backend mode for local UI testing.
+        </div>
+      )}
+
       {/* Repo URL(s) */}
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
@@ -579,7 +592,9 @@ export function EvalForm({
       >
         {isLoading
           ? "Evaluating…"
-          : fileState.isExtracting
+          : !backendReady
+            ? "Backend not ready"
+            : fileState.isExtracting
             ? "Extracting…"
             : notesState.fileStatus === "processing"
               ? "Processing notes…"

@@ -59,7 +59,7 @@ function MultiRepoTabs({ results, repoUrls }: MultiRepoTabsProps) {
 }
 
 export function EvalPage({ onNewEvaluation }: EvalPageProps) {
-  const { data, loading, error, evaluate, reset } = useEvaluation();
+  const { data, loading, error, evaluate, reset, isReady } = useEvaluation();
   const fileExtraction = useFileExtraction();
   const notesExtraction = useNotesExtraction();
 
@@ -136,6 +136,7 @@ export function EvalPage({ onNewEvaluation }: EvalPageProps) {
       <EvalForm
         onSubmit={handleSubmit}
         isLoading={loading}
+        backendReady={isReady}
         repoEntries={repoEntries}
         setRepoEntries={setRepoEntries}
         assignment={assignment}

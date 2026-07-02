@@ -1012,13 +1012,6 @@ export function ReportingPage() {
     refetch,
   } = useReporting();
 
-  // Debug: verify dashboard is mounting and receiving data
-  console.log("[Dashboard] render:", {
-    isLoading,
-    error: error?.message ?? null,
-    allRecords_length: allRecords.length,
-  });
-
   const {
     downloadFullSummary,
     downloadRoleReport,

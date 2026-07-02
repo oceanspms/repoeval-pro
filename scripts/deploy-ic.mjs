@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -12,20 +12,32 @@ const originalFrontendEnv = fs.existsSync(frontendEnvPath)
 const backendHost =
   network === "local" ? "http://127.0.0.1:4943" : "https://icp-api.io";
 
+function commandLine(command, args) {
+  return [command, ...args].join(" ");
+}
+
 function run(command, args, options = {}) {
-  console.log(`[deploy] ${command} ${args.join(" ")}`);
-  execFileSync(command, args, {
-    cwd: options.cwd ?? root,
-    stdio: "inherit",
-    shell: process.platform === "win32",
-  });
+  console.log(`[deploy] ${commandLine(command, args)}`);
+  if (process.platform === "win32") {
+    execSync(commandLine(command, args), {
+      cwd: options.cwd ?? root,
+      stdio: "inherit",
+    });
+    return;
+  }
+  execFileSync(command, args, { cwd: options.cwd ?? root, stdio: "inherit" });
 }
 
 function capture(command, args, options = {}) {
+  if (process.platform === "win32") {
+    return execSync(commandLine(command, args), {
+      cwd: options.cwd ?? root,
+      encoding: "utf8",
+    }).trim();
+  }
   return execFileSync(command, args, {
     cwd: options.cwd ?? root,
     encoding: "utf8",
-    shell: process.platform === "win32",
   }).trim();
 }
 

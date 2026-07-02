@@ -42,6 +42,7 @@ From the repository root:
 
 ```powershell
 corepack pnpm install --prefer-offline
+corepack pnpm qa:toolchain
 corepack pnpm bindgen
 corepack pnpm qa:deployment
 ```
@@ -73,6 +74,12 @@ Prerequisites:
 - `dfx` installed and available on `PATH`.
 - `mops` available on `PATH`.
 - For `deploy:ic`, a configured DFX identity with cycles.
+
+Check local deployment tooling with:
+
+```powershell
+corepack pnpm qa:toolchain
+```
 
 From `src/frontend/`:
 

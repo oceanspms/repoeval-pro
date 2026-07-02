@@ -11,6 +11,8 @@
     "typecheck": "pnpm -r --if-present run typecheck",
     "check": "pnpm -r --if-present run check",
     "fix": "pnpm -r --if-present run fix",
+    "deploy:ic": "node scripts/deploy-ic.mjs",
+    "deploy:local": "node scripts/deploy-ic.mjs --local",
     "qa:deployment": "node scripts/verify-deployment.mjs",
     "qa:deployment:strict": "node scripts/verify-deployment.mjs --strict-env",
     "bindgen": "caffeine-bindgen --did-file ./src/backend/dist/backend.did --out-dir ./src/frontend/src --actor-interface-file --force"

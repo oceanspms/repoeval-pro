@@ -48,6 +48,32 @@ corepack pnpm qa:deployment
 
 If using DFX, `dfx.json` deploys the backend as a custom canister from the existing Mops build output and the frontend as an assets canister from `src/frontend/dist`.
 
+## Independent DFX Deployment
+
+Use the repo-owned deploy scripts instead of Caffeine.
+
+Local validation:
+
+```powershell
+corepack pnpm deploy:local
+```
+
+Production IC deployment:
+
+```powershell
+corepack pnpm deploy:ic
+```
+
+Both scripts build the backend, regenerate frontend bindings, deploy the backend,
+write `src/frontend/env.json` with the backend canister ID, build the frontend,
+deploy frontend assets, and run strict deployment verification.
+
+Prerequisites:
+
+- `dfx` installed and available on `PATH`.
+- `mops` available on `PATH`.
+- For `deploy:ic`, a configured DFX identity with cycles.
+
 From `src/frontend/`:
 
 ```powershell

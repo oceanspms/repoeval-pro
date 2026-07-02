@@ -43,6 +43,7 @@ From the repository root:
 ```powershell
 corepack pnpm install --prefer-offline
 corepack pnpm bindgen
+corepack pnpm qa:deployment
 ```
 
 If using DFX, `dfx.json` deploys the backend as a custom canister from the existing Mops build output and the frontend as an assets canister from `src/frontend/dist`.
@@ -64,6 +65,20 @@ corepack pnpm dev
 ```
 
 Mock mode bypasses live actor calls and uses in-memory evaluation/history data. Do not enable it for production builds.
+
+After the frontend and backend build artifacts exist, run this root-level check
+to verify the deployment package shape:
+
+```powershell
+corepack pnpm qa:deployment
+```
+
+Use the strict variant only when `src/frontend/env.json` contains the real
+deployed backend host and canister ID:
+
+```powershell
+corepack pnpm qa:deployment:strict
+```
 
 From a Linux/WSL shell for the backend:
 

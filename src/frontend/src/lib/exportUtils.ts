@@ -21,6 +21,15 @@ function csvRow(fields: string[]): string {
   return fields.map(escapeField).join(",");
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function todayStr(): string {
   return new Date().toISOString().slice(0, 10);
 }
@@ -225,6 +234,10 @@ export function generateCandidateBrief(record: EvaluationRecord): void {
       .replace(/^https?:\/\/(www\.)?github\.com\//i, "")
       .split("/")[0] ||
     "Unknown Candidate";
+  const safeOwnerName = escapeHtml(ownerName);
+  const safeRepoUrl = escapeHtml(record.repo_url);
+  const safeRepoLabel = escapeHtml(record.repo_url.replace(/^https?:\/\//, ""));
+  const safeProjectType = escapeHtml(r.project_type);
 
   const ms =
     Number(record.timestamp) > 1e12
@@ -301,7 +314,7 @@ export function generateCandidateBrief(record: EvaluationRecord): void {
     .map(
       (d) => `
     <tr>
-      <td style="padding:6px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;">${d.label}</td>
+      <td style="padding:6px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;">${escapeHtml(d.label)}</td>
       <td style="padding:6px 12px;font-size:13px;font-weight:600;text-align:right;color:${d.value >= 70 ? "#166534" : d.value >= 40 ? "#854d0e" : "#991b1b"};border-bottom:1px solid #f3f4f6;">${d.value}/100</td>
     </tr>`,
     )
@@ -310,20 +323,20 @@ export function generateCandidateBrief(record: EvaluationRecord): void {
   const strengthItems = strengths
     .map(
       (s) =>
-        `<li style="margin-bottom:4px;font-size:13px;color:#374151;">✓ <strong>${s.label}</strong> — ${s.value}/100</li>`,
+        `<li style="margin-bottom:4px;font-size:13px;color:#374151;">✓ <strong>${escapeHtml(s.label)}</strong> — ${s.value}/100</li>`,
     )
     .join("");
 
   const weaknessItems = weaknesses
     .map(
       (w) =>
-        `<li style="margin-bottom:4px;font-size:13px;color:#374151;">✗ <strong>${w.label}</strong> — ${w.value}/100</li>`,
+        `<li style="margin-bottom:4px;font-size:13px;color:#374151;">✗ <strong>${escapeHtml(w.label)}</strong> — ${w.value}/100</li>`,
     )
     .join("");
 
   const missingList =
     missingItems.length > 0
-      ? `<ul style="margin:0;padding-left:16px;">${missingItems.map((m) => `<li style="font-size:13px;color:#374151;margin-bottom:3px;">${m}</li>`).join("")}</ul>`
+      ? `<ul style="margin:0;padding-left:16px;">${missingItems.map((m) => `<li style="font-size:13px;color:#374151;margin-bottom:3px;">${escapeHtml(m)}</li>`).join("")}</ul>`
       : `<p style="font-size:13px;color:#6b7280;font-style:italic;margin:0;">No missing items — all requirements covered.</p>`;
 
   const debtPillBg =
@@ -336,7 +349,7 @@ export function generateCandidateBrief(record: EvaluationRecord): void {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Candidate Brief — @${ownerName}</title>
+  <title>Candidate Brief — @${safeOwnerName}</title>
   <style>
     @media print {
       body { margin: 0; }
@@ -352,12 +365,12 @@ export function generateCandidateBrief(record: EvaluationRecord): void {
     <div style="background:#1e293b;padding:24px 28px;display:flex;justify-content:space-between;align-items:flex-start;">
       <div>
         <p style="color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;margin:0 0 4px;">Candidate Brief</p>
-        <h1 style="color:#f1f5f9;font-size:22px;font-weight:700;margin:0 0 6px;">@${ownerName}</h1>
-        <span style="display:inline-block;background:#334155;color:#cbd5e1;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;border:1px solid #475569;">${r.project_type}</span>
+        <h1 style="color:#f1f5f9;font-size:22px;font-weight:700;margin:0 0 6px;">@${safeOwnerName}</h1>
+        <span style="display:inline-block;background:#334155;color:#cbd5e1;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;border:1px solid #475569;">${safeProjectType}</span>
       </div>
       <div style="text-align:right;">
         <p style="color:#64748b;font-size:11px;margin:0 0 4px;">${dateStr}</p>
-        <a href="${record.repo_url}" style="color:#60a5fa;font-size:11px;text-decoration:none;">${record.repo_url.replace(/^https?:\/\//, "")}</a>
+        <a href="${safeRepoUrl}" style="color:#60a5fa;font-size:11px;text-decoration:none;">${safeRepoLabel}</a>
       </div>
     </div>
 
@@ -374,11 +387,11 @@ export function generateCandidateBrief(record: EvaluationRecord): void {
       <!-- Verdict -->
       <div style="background:${verdictBg};border:1px solid ${verdictBorder};border-radius:8px;padding:16px 20px;">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-          <span style="font-size:24px;">${verdict.emoji}</span>
-          <span style="font-size:16px;font-weight:700;color:${verdictColor};">${verdict.verdict}</span>
-          <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${debtPillBg};color:${debtPillColor};border:1px solid ${debtPillColor}33;">${verdict.technical_debt}</span>
+          <span style="font-size:24px;">${escapeHtml(verdict.emoji)}</span>
+          <span style="font-size:16px;font-weight:700;color:${verdictColor};">${escapeHtml(String(verdict.verdict))}</span>
+          <span style="font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;background:${debtPillBg};color:${debtPillColor};border:1px solid ${debtPillColor}33;">${escapeHtml(verdict.technical_debt)}</span>
         </div>
-        <p style="color:#374151;font-size:13px;line-height:1.6;margin:0;">${verdict.why}</p>
+        <p style="color:#374151;font-size:13px;line-height:1.6;margin:0;">${escapeHtml(verdict.why)}</p>
       </div>
 
       <!-- Score Dimensions -->

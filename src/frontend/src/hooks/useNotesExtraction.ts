@@ -5,6 +5,10 @@
  */
 import { useCallback, useRef, useState } from "react";
 import { type backendInterface } from "../backend";
+import {
+  canExtractInBrowser,
+  extractTextInBrowser,
+} from "../lib/clientFileText";
 import { useBackendActor } from "./useBackendActor";
 import type { FileUploadStatus } from "./useFileExtraction";
 
@@ -132,6 +136,45 @@ export function useNotesExtraction(): UseNotesExtraction {
       fileText: "",
       combinedText: buildCombined("", s.manualText, s.fetchedDocText),
     }));
+
+    if (canExtractInBrowser(file.name)) {
+      try {
+        const text = await extractTextInBrowser(file);
+        const normalized = normalizeText(text);
+        setState((s) => {
+          const fileText = normalized;
+          return {
+            ...s,
+            fileStatus: normalized ? "ready" : "error",
+            fileError: normalized
+              ? ""
+              : "File appears empty or contains scanned/non-selectable text.",
+            fileText,
+            combinedText: buildCombined(
+              fileText,
+              s.manualText,
+              s.fetchedDocText,
+            ),
+          };
+        });
+        return;
+      } catch (err) {
+        const msg =
+          err instanceof Error
+            ? err.message
+            : "Could not extract text in the browser.";
+        if (file.size > 1_800_000) {
+          setState((s) => ({
+            ...s,
+            fileStatus: "error",
+            fileError: `${msg} The file is too large for backend extraction.`,
+            fileText: "",
+            combinedText: buildCombined("", s.manualText, s.fetchedDocText),
+          }));
+          return;
+        }
+      }
+    }
 
     const ready = await waitForActorReady(actorRef, isFetchingRef);
     if (!ready || !actorRef.current) {

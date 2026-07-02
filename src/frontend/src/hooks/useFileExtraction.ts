@@ -1,5 +1,9 @@
 import { useCallback, useRef, useState } from "react";
 import { type backendInterface } from "../backend";
+import {
+  canExtractInBrowser,
+  extractTextInBrowser,
+} from "../lib/clientFileText";
 import { useBackendActor } from "./useBackendActor";
 
 export type FileUploadStatus =
@@ -151,6 +155,58 @@ export function useFileExtraction(): UseFileExtraction {
       showCleanButton: false,
       autoCleanNote: "",
     }));
+
+    if (canExtractInBrowser(file.name)) {
+      try {
+        const text = await extractTextInBrowser(file);
+        const normalized = normalizeText(text);
+
+        if (!normalized) {
+          setState((s) => ({
+            ...s,
+            status: "error",
+            isExtracting: false,
+            error:
+              "File appears empty or contains scanned/non-selectable text. Please paste the assignment text manually.",
+            extractedText: "",
+            showCleanButton: false,
+            autoCleanNote: "",
+          }));
+          return;
+        }
+
+        setState((s) => ({
+          ...s,
+          status: "ready",
+          isExtracting: false,
+          error: "",
+          extractedText: normalized,
+          showCleanButton: false,
+          autoCleanNote:
+            file.size > 1_800_000
+              ? "Large file extracted in browser to avoid backend upload limits."
+              : "",
+        }));
+        return;
+      } catch (err) {
+        const msg =
+          err instanceof Error
+            ? err.message
+            : "Could not extract text in the browser.";
+        if (file.size > 1_800_000) {
+          setState((s) => ({
+            ...s,
+            status: "error",
+            isExtracting: false,
+            error: `${msg} The file is too large for backend extraction, so paste the assignment text manually or upload a text-based PDF.`,
+            extractedText: "",
+            showCleanButton: false,
+            autoCleanNote: "",
+          }));
+          return;
+        }
+      }
+    }
 
     const ready = await waitForActorReady(actorRef, isFetchingRef);
     if (!ready || !actorRef.current) {

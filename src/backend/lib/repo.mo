@@ -115,6 +115,21 @@ module {
     // 4. .env.example
     addFirst([".env.example", ".env.sample", "env.example"]);
     // 5–6: Up to 2 test files
+    var backendCount = 0;
+    for (p in filePaths.values()) {
+      if (backendCount >= 2) ();
+      let pl2 = p.toLower();
+      let isBackendEvidence =
+        pl2.contains(#text "routes/") or pl2.contains(#text "controllers/") or
+        pl2.contains(#text "router") or pl2.contains(#text "middleware/") or
+        pl2.contains(#text "schema.") or pl2.contains(#text "prisma/") or
+        pl2.contains(#text "models/") or pl2.contains(#text "services/");
+      if (isBackendEvidence and not selected.any(func(s) { s == p })) {
+        selected := selected.concat([p]);
+        backendCount += 1;
+      };
+    };
+
     var testCount = 0;
     for (p in filePaths.values()) {
       if (testCount >= 2) ();

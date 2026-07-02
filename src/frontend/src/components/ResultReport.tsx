@@ -14,6 +14,8 @@ interface ResultReportProps {
   result: EvaluationResult;
 }
 
+const IS_MOCK_BACKEND = import.meta.env.VITE_USE_MOCK_BACKEND === "true";
+
 function toNum(v: bigint): number {
   return Number(v);
 }
@@ -275,6 +277,26 @@ export function ResultReport({ result }: ResultReportProps) {
           </span>
           {/* Alignment badge sits inline */}
           <AlignmentBadge alignment={result.alignment} />
+          <span
+            data-ocid="result.final_score_inline"
+            className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full border bg-background/70 text-foreground border-border"
+          >
+            {finalScore}/100
+          </span>
+          <span
+            data-ocid="result.role_inline"
+            className="text-xs font-mono px-2 py-0.5 rounded-full border bg-background/70 text-muted-foreground border-border"
+          >
+            {result.project_type}
+          </span>
+          {IS_MOCK_BACKEND && (
+            <span
+              data-ocid="result.mock_mode_badge"
+              className="text-xs font-mono font-semibold px-2 py-0.5 rounded-full border bg-amber-100 text-amber-800 border-amber-300"
+            >
+              Mock Preview
+            </span>
+          )}
         </div>
 
         {/* Why */}

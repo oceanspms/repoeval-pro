@@ -54,13 +54,13 @@ module {
         lower.contains(#text "prioritize docker") or
         lower.contains(#text "focus on docker")) {
       demoReadiness_mult := Float.max(demoReadiness_mult, 2.0);
-      instructions := instructions.concat(["weight_demo_readiness"]);
+      instructions := instructions.concat(["Evaluator instruction: weight deployment/demo evidence more heavily"]);
     };
 
     // ── coverage weighting ───────────────────────────────────────────────────
     if (lower.contains(#text "weight coverage") or lower.contains(#text "prioritize coverage")) {
       coverage_mult := 2.0;
-      instructions := instructions.concat(["weight_coverage"]);
+      instructions := instructions.concat(["Evaluator instruction: weight assignment coverage more heavily"]);
     };
 
     // ── docs / documentation weighting ──────────────────────────────────────
@@ -68,28 +68,28 @@ module {
         lower.contains(#text "weight documentation") or
         lower.contains(#text "prioritize documentation")) {
       docs_mult := Float.max(docs_mult, 2.0);
-      instructions := instructions.concat(["weight_docs"]);
+      instructions := instructions.concat(["Evaluator instruction: weight documentation more heavily"]);
     };
 
     // ── frontend / UI weighting ──────────────────────────────────────────────
     if (lower.contains(#text "weight frontend") or lower.contains(#text "prioritize ui")) {
       stack_mult        := Float.max(stack_mult, 1.5);
       completeness_mult := Float.max(completeness_mult, 1.5);
-      instructions := instructions.concat(["weight_frontend"]);
+      instructions := instructions.concat(["Evaluator instruction: weight frontend/UI evidence more heavily"]);
     };
 
     // ── tests / testing weighting ────────────────────────────────────────────
     if (lower.contains(#text "weight tests") or lower.contains(#text "focus on testing")) {
       depth_mult        := Float.max(depth_mult, 1.5);
       completeness_mult := Float.max(completeness_mult, 1.5);
-      instructions := instructions.concat(["weight_tests"]);
+      instructions := instructions.concat(["Evaluator instruction: weight tests more heavily"]);
     };
 
     // ── API / backend weighting ──────────────────────────────────────────────
     if (lower.contains(#text "weight api") or lower.contains(#text "focus on backend")) {
       stack_mult := Float.max(stack_mult, 1.5);
       depth_mult := Float.max(depth_mult, 1.5);
-      instructions := instructions.concat(["weight_api"]);
+      instructions := instructions.concat(["Evaluator instruction: weight backend/API evidence more heavily"]);
     };
 
     {

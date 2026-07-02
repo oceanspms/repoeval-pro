@@ -132,6 +132,64 @@ module {
     failures := failIf(backendCoverage > 40, "missing core backend requirements must materially reduce coverage", failures);
     failures := failIf(backendStack != 0, "backend stack match should be 0 when no backend/API/database signals exist", failures);
 
+    let fullRepoBackendAssignment : Types.ParsedAssignment = {
+      role = "Backend";
+      required_items = ["REST API server", "PostgreSQL persistence", "tests"];
+      core_items = ["REST API server", "PostgreSQL persistence"];
+      secondary_items = ["tests"];
+    };
+    let fullRepoSignals : Types.RepoSignals = {
+      baseSignals() with
+      readme_text = "Backend API service with PostgreSQL. Live API URL: https://example.com";
+      file_tree = ["src/server.ts", "src/routes/tasks.ts", "src/App.tsx", "tests/api.test.ts", "package.json"];
+      has_backend = true;
+      has_frontend = true;
+      has_api_routes = true;
+      has_db_config = true;
+      has_demo_link = true;
+      has_working_demo_link = false;
+      demo_url = ?"https://example.com";
+      file_count = 32;
+      readme_word_count = 140;
+      test_count = 2;
+    };
+    failures := failIf(
+      Scoring.projectType(fullRepoBackendAssignment, fullRepoSignals) != "Backend",
+      "backend assignment must stay Backend even when repo also contains frontend files",
+      failures,
+    );
+    failures := failIf(
+      Scoring.demoScore(fullRepoSignals) > 50,
+      "unverified live API/demo URL must remain weak evidence",
+      failures,
+    );
+    let verifiedApiSignals : Types.RepoSignals = { fullRepoSignals with has_working_demo_link = true };
+    failures := failIf(
+      Scoring.demoScore(verifiedApiSignals) < 90,
+      "verified live API/demo evidence should strongly improve run/deploy readiness",
+      failures,
+    );
+    let verdictWithEvidence = Scoring.buildRecruiterVerdict(
+      {
+        coverage = 90;
+        stackMatch = 100;
+        completeness = 85;
+        depth = 80;
+        docs = 75;
+        demoReadiness = 90;
+        aiUsage = 60;
+      },
+      86,
+      [],
+      fullRepoBackendAssignment,
+      verifiedApiSignals,
+    );
+    failures := failIf(
+      not verdictWithEvidence.strengths.any(func(s) { s == "Live API evidence verified" }),
+      "verified backend live URL should appear as concrete API evidence",
+      failures,
+    );
+
     let baseScores : Types.Scores = {
       coverage = 80;
       stackMatch = 80;

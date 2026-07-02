@@ -7,3 +7,4 @@ dist/
 .cache/
 .wsl/
 .dfx/
+.logs/

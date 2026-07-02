@@ -525,11 +525,11 @@ export function EvalForm({
           <textarea
             data-ocid="eval.notes.textarea"
             id="notes"
-            rows={3}
+            rows={6}
             placeholder="Enter notes, paste URLs (Google Docs, GitHub repo, Notion), or add instructions like: Weight Dockerfile more heavily / Ignore prompt log / Focus on testing"
             value={notesState.manualText}
             onChange={(e) => setManualText(e.target.value)}
-            className="input-field text-sm resize-none w-full"
+            className="input-field text-sm resize-y min-h-[9rem] w-full"
           />
           {/* Google Docs fetch button — appears when a GDoc URL is detected */}
           {isGdocUrl && (

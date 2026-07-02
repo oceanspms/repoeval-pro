@@ -9,35 +9,47 @@ import type {
 
 const sampleResult: EvaluationResult = {
   scores: {
-    coverage: BigInt(90),
-    stackMatch: BigInt(80),
-    completeness: BigInt(90),
-    depth: BigInt(70),
+    coverage: BigInt(82),
+    stackMatch: BigInt(90),
+    completeness: BigInt(85),
+    depth: BigInt(78),
     docs: BigInt(80),
-    demoReadiness: BigInt(30),
+    demoReadiness: BigInt(90),
     aiUsage: BigInt(60),
   },
   summary:
-    "Strong fullstack submission with excellent coverage (90/100) and solid documentation (80/100). The candidate demonstrates deep knowledge of the required stack with good completeness (90/100). The biggest gap is demo readiness (30/100) because no live demo or working prototype was provided. AI evidence is moderate (60/100). Overall a compelling submission that warrants an interview despite the demo gap.",
-  missing_items: ["Live demo URL", "docker-compose.yml", "CI/CD pipeline config"],
-  final_score: BigInt(78),
+    "OVERVIEW: Mock preview result for a Backend assignment. Backend/API code, database configuration, tests, README setup notes, and verified live API evidence are present. Final score is 83/100.\n\nSTRENGTHS: Backend/API code detected; API route/controller evidence found; Database/persistence configuration found; Tests detected: 4; Live API evidence verified.\n\nCRITICAL GAPS: CI/CD is not present, but Docker/compose is not treated as critical because this assignment did not require it.\n\nRECOMMENDATION: Advance to technical interview and verify implementation ownership.",
+  missing_items: ["CI/CD pipeline config"],
+  final_score: BigInt(83),
   timestamp: BigInt(Date.now()),
   cached: false,
-  red_flags: ["No live demo found", "Missing docker-compose"],
-  project_type: "Fullstack",
+  red_flags: [],
+  project_type: "Backend",
   alignment: "High" as unknown as Alignment,
-  strengths: ["Coverage", "Completeness", "Stack Match"],
-  criticalGaps: ["No live demo", "Missing docker-compose"],
+  strengths: [
+    "Backend/API code detected",
+    "API route/controller evidence found",
+    "Database/persistence configuration found",
+    "Tests detected: 4",
+    "Live API evidence verified",
+  ],
+  criticalGaps: ["Missing: CI/CD pipeline config"],
   recruiter_verdict: {
     verdict: Variant_fail_pass_caution.pass,
     emoji: "✅",
     why:
-      "This candidate built a production-grade fullstack app with clean code and thorough documentation. The only notable gap is the absence of a live demo, which is a minor concern given the overall quality.",
+      "This mock backend assignment result scored 83/100 with verified API evidence and backend code signals. Docker compose is not marked critical because it was not required by the assignment.",
     technical_debt: "Production Ready",
-    strengths: ["Coverage", "Completeness", "Stack Match"],
-    criticalGaps: ["No live demo", "Missing docker-compose"],
+    strengths: [
+      "Backend/API code detected",
+      "API route/controller evidence found",
+      "Database/persistence configuration found",
+      "Tests detected: 4",
+      "Live API evidence verified",
+    ],
+    criticalGaps: ["Missing: CI/CD pipeline config"],
   },
-  applied_instructions: ["Weighted Dockerfile more heavily per recruiter notes"],
+  applied_instructions: ["Verified live API evidence", "Mock preview data"],
 };
 
 const sampleResult2: EvaluationResult = {

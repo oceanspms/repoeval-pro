@@ -279,10 +279,10 @@ module {
         // Link exists but HTTP verification failed or was not performed.
         // The link may still be a valid deployment — do NOT punish heavily.
         // Base score 60; boost slightly for additional setup signals.
-        var s : Int = 60;
+        var s : Int = 35;
         if (signals.has_dockerfile or signals.has_compose) s += 5;
         if (signals.has_scripts or signals.has_setup_script) s += 5;
-        return Nat.min(s.toNat(), 75);
+        return Nat.min(s.toNat(), 50);
       };
     };
 
@@ -415,6 +415,9 @@ module {
     };
     if ((role.contains(#text "backend") or role.contains(#text "fullstack")) and not signals.has_backend) {
       flags := flags.concat(["No backend code found"]);
+    };
+    if ((role.contains(#text "backend") or role.contains(#text "fullstack")) and signals.has_demo_link and not signals.has_working_demo_link) {
+      flags := flags.concat(["Live API/demo URL found but not verified"]);
     };
     if (role.contains(#text "devops") and not signals.has_dockerfile and not signals.has_ci and not signals.has_terraform) {
       flags := flags.concat(["No infrastructure/DevOps files found"]);
@@ -755,6 +758,8 @@ module {
     scores       : Types.Scores,
     finalScore_  : Nat,
     missingItems : [Text],
+    parsed       : Types.ParsedAssignment,
+    signals      : Types.RepoSignals,
   ) : Types.RecruiterVerdict {
     let verdict = verdictFromScore(finalScore_, scores);
     let emoji : Text =
@@ -798,20 +803,31 @@ module {
         };
       };
     var strengthsList : [Text] = [];
-    if (scores.coverage >= 70)      strengthsList := strengthsList.concat(["Coverage: " # scores.coverage.toText() # "/100"]);
-    if (scores.stackMatch >= 70)    strengthsList := strengthsList.concat(["Stack Match: " # scores.stackMatch.toText() # "/100"]);
-    if (scores.completeness >= 70)  strengthsList := strengthsList.concat(["Completeness: " # scores.completeness.toText() # "/100"]);
-    if (scores.depth >= 70)         strengthsList := strengthsList.concat(["Implementation Depth: " # scores.depth.toText() # "/100"]);
-    if (scores.docs >= 70)          strengthsList := strengthsList.concat(["Documentation: " # scores.docs.toText() # "/100"]);
-    if (scores.demoReadiness >= 70) strengthsList := strengthsList.concat(["Demo Readiness: " # scores.demoReadiness.toText() # "/100"]);
-    if (scores.aiUsage >= 70)       strengthsList := strengthsList.concat(["AI Usage: " # scores.aiUsage.toText() # "/100"]);
+    if (signals.has_backend) strengthsList := strengthsList.concat(["Backend/API code detected"]);
+    if (signals.has_api_routes) strengthsList := strengthsList.concat(["API route/controller evidence found"]);
+    if (signals.has_db_config) strengthsList := strengthsList.concat(["Database/persistence configuration found"]);
+    if (signals.has_auth) strengthsList := strengthsList.concat(["Authentication evidence found"]);
+    if (signals.test_count > 0) strengthsList := strengthsList.concat(["Tests detected: " # signals.test_count.toText()]);
+    if (signals.has_working_demo_link) {
+      let role = parsed.role.toLower();
+      strengthsList := strengthsList.concat([
+        if (role.contains(#text "backend") or role.contains(#text "fullstack")) "Live API evidence verified" else "Live demo evidence verified"
+      ]);
+    };
+    if (signals.has_scripts) strengthsList := strengthsList.concat(["Start/dev scripts found"]);
+    if (signals.readme_word_count >= 100) strengthsList := strengthsList.concat(["README/setup documentation present"]);
+    if (signals.fetched_file_paths.size() > 0) {
+      strengthsList := strengthsList.concat(["Source files reviewed: " # signals.fetched_file_paths.size().toText()]);
+    };
+    if (strengthsList.size() == 0 and scores.coverage >= 70) strengthsList := strengthsList.concat(["Assignment coverage: " # scores.coverage.toText() # "/100"]);
     var gapsList : [Text] = [];
     if (scores.coverage < 50)      gapsList := gapsList.concat(["Coverage below 50 (" # scores.coverage.toText() # ")"]);
     if (scores.stackMatch < 50)    gapsList := gapsList.concat(["Stack Match below 50 (" # scores.stackMatch.toText() # ")"]);
     if (scores.completeness < 50)  gapsList := gapsList.concat(["Completeness below 50 (" # scores.completeness.toText() # ")"]);
     if (scores.depth < 50)         gapsList := gapsList.concat(["Depth below 50 (" # scores.depth.toText() # ")"]);
     if (scores.docs < 50)          gapsList := gapsList.concat(["Docs below 50 (" # scores.docs.toText() # ")"]);
-    if (scores.demoReadiness < 50) gapsList := gapsList.concat(["Demo Readiness below 50 (" # scores.demoReadiness.toText() # ")"]);
+    if (signals.has_demo_link and not signals.has_working_demo_link) gapsList := gapsList.concat(["Submitted live URL could not be verified"]);
+    if (scores.demoReadiness < 50) gapsList := gapsList.concat(["Run/deploy evidence below 50 (" # scores.demoReadiness.toText() # ")"]);
     let topMissing = missingItems.sliceToArray(0, Nat.min(3, missingItems.size()));
     for (item in topMissing.values()) {
       gapsList := gapsList.concat(["Missing: " # item]);

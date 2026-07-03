@@ -259,10 +259,10 @@ export function EvalForm({
   }
 
   function handleNotesFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
     e.target.value = "";
-    void handleNotesFileSelect(file);
+    void handleNotesFileSelect(files);
   }
 
   function handleClearFile() {
@@ -497,27 +497,33 @@ export function EvalForm({
             ref={notesFileRef}
             type="file"
             accept={ACCEPTED_NOTES_TYPES}
+            multiple
             onChange={handleNotesFileChange}
             className="hidden"
-            aria-label="Upload notes file"
+            aria-label="Upload notes files"
           />
         </div>
 
-        {/* Notes file pill */}
-        {notesState.file && (
-          <FileStatusPill
-            file={notesState.file}
-            status={notesState.fileStatus}
-            error={
-              notesState.fileStatus === "error"
-                ? `${notesState.fileError} (Evaluation will continue without this file.)`
-                : notesState.fileError
-            }
-            onClear={clearNotesFile}
-            onRetry={() => void retryNotesFile()}
-            loadingLabel="Extracting…"
-            ocidPrefix="eval.notes_file"
-          />
+        {/* Notes file pills */}
+        {notesState.files.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {notesState.files.map((entry, index) => (
+              <FileStatusPill
+                key={entry.id}
+                file={entry.file}
+                status={entry.status}
+                error={
+                  entry.status === "error"
+                    ? `${entry.error} (Evaluation will continue without this file.)`
+                    : entry.error
+                }
+                onClear={() => clearNotesFile(entry.id)}
+                onRetry={() => void retryNotesFile(entry.id)}
+                loadingLabel="Extracting…"
+                ocidPrefix={`eval.notes_file.${index + 1}`}
+              />
+            ))}
+          </div>
         )}
 
         {/* Notes text area: paste text, URLs, or evaluation instructions */}
@@ -572,7 +578,13 @@ export function EvalForm({
         {notesState.combinedText.trim() && (
           <p className="text-[11px] text-muted-foreground">
             {[
-              notesState.fileText && "file content",
+              notesState.fileText &&
+                `${notesState.files.filter((entry) => entry.status === "ready").length} file${
+                  notesState.files.filter((entry) => entry.status === "ready")
+                    .length === 1
+                    ? ""
+                    : "s"
+                } content`,
               notesState.fetchedDocText && "Google Doc",
               isGdocUrl && !notesState.fetchedDocText && "Google Doc URL",
               !isGdocUrl && notesState.manualText.trim() && "manual notes",

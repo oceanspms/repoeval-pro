@@ -1,3 +1,4 @@
+import mammoth from "mammoth";
 import * as pdfjs from "pdfjs-dist";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
 
@@ -11,7 +12,7 @@ function extensionFor(fileName: string): string {
 
 export function canExtractInBrowser(fileName: string): boolean {
   const ext = extensionFor(fileName);
-  return ext === "pdf" || TEXT_EXTENSIONS.has(ext);
+  return ext === "pdf" || ext === "docx" || TEXT_EXTENSIONS.has(ext);
 }
 
 export async function extractTextInBrowser(file: File): Promise<string> {
@@ -36,6 +37,12 @@ export async function extractTextInBrowser(file: File): Promise<string> {
     }
 
     return pages.join("\n\n");
+  }
+
+  if (ext === "docx") {
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result.value;
   }
 
   throw new Error("Browser extraction is not available for this file type.");

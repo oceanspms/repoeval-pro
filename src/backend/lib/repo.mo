@@ -110,21 +110,21 @@ module {
     addFirst(["src/index.ts", "src/main.ts", "src/app.ts", "server.ts", "src/server.ts",
               "src/index.js", "src/main.js", "src/app.js", "server.js", "index.ts",
               "app.ts", "index.js", "main.py", "app.py", "main.go"]);
-    // 3. Dockerfile
-    addFirst(["Dockerfile", "dockerfile"]);
-    // 4. .env.example
-    addFirst([".env.example", ".env.sample", "env.example"]);
+    // Deployment/config files are added after implementation files below.
     // 5–6: Up to 2 test files
     var backendCount = 0;
     for (p in filePaths.values()) {
-      if (backendCount >= 2) ();
+      if (backendCount >= 4) ();
       let pl2 = p.toLower();
       let isBackendEvidence =
         pl2.contains(#text "routes/") or pl2.contains(#text "controllers/") or
-        pl2.contains(#text "router") or pl2.contains(#text "middleware/") or
+        pl2.contains(#text "router") or pl2.contains(#text "views.") or
+        pl2.contains(#text "viewsets") or pl2.contains(#text "serializers.") or
+        pl2.contains(#text "permissions.") or pl2.contains(#text "middleware/") or
         pl2.contains(#text "schema.") or pl2.contains(#text "prisma/") or
-        pl2.contains(#text "models/") or pl2.contains(#text "services/");
-      if (isBackendEvidence and not selected.any(func(s) { s == p })) {
+        pl2.contains(#text "models.") or pl2.contains(#text "models/") or
+        pl2.contains(#text "migrations/") or pl2.contains(#text "services/");
+      if (backendCount < 4 and selected.size() < 8 and isBackendEvidence and not selected.any(func(s) { s == p })) {
         selected := selected.concat([p]);
         backendCount += 1;
       };
@@ -132,9 +132,8 @@ module {
 
     var testCount = 0;
     for (p in filePaths.values()) {
-      if (testCount >= 2) ();
       let pl2 = p.toLower();
-      if ((pl2.contains(#text ".test.") or pl2.contains(#text ".spec.")) and
+      if (testCount < 2 and selected.size() < 8 and (pl2.contains(#text ".test.") or pl2.contains(#text ".spec.") or pl2.contains(#text "test_") or pl2.contains(#text "/tests/")) and
           not selected.any(func(s) { s == p })) {
         selected := selected.concat([p]);
         testCount += 1;
@@ -143,7 +142,6 @@ module {
     // 7–8: Up to 2 significant src files not yet selected
     var srcCount = 0;
     for (p in filePaths.values()) {
-      if (srcCount >= 2) ();
       let pl2 = p.toLower();
       let isSource = (pl2.endsWith(#text ".ts") or pl2.endsWith(#text ".js") or
                       pl2.endsWith(#text ".tsx") or pl2.endsWith(#text ".jsx") or
@@ -152,11 +150,14 @@ module {
                      (pl2.contains(#text "src/") or pl2.contains(#text "app/") or
                       pl2.contains(#text "lib/") or pl2.contains(#text "controllers/") or
                       pl2.contains(#text "routes/") or pl2.contains(#text "components/"));
-      if (isSource and not selected.any(func(s) { s == p })) {
+      let lowValue = pl2.endsWith(#text "__init__.py") or pl2.contains(#text ".env");
+      if (srcCount < 2 and selected.size() < 8 and isSource and not lowValue and not selected.any(func(s) { s == p })) {
         selected := selected.concat([p]);
         srcCount += 1;
       };
     };
+    addFirst(["Dockerfile", "dockerfile"]);
+    addFirst([".env.example", ".env.sample", "env.example"]);
     selected;
   };
 

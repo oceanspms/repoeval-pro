@@ -551,14 +551,14 @@ export function ResultReport({ result }: ResultReportProps) {
           className="bg-card border border-border rounded-lg px-4 py-3.5 flex flex-col gap-2.5"
         >
           <h3 className="text-xs uppercase tracking-wider text-muted-foreground font-mono font-semibold">
-            Missing Items
+            Requirements Needing Validation
           </h3>
           {missing.length === 0 ? (
             <p
               data-ocid="result.missing_items.empty_state"
               className="text-xs text-muted-foreground italic"
             >
-              None — all requirements covered.
+              None - all extracted requirements are covered.
             </p>
           ) : (
             <ul className="flex flex-col gap-1.5">
@@ -581,7 +581,7 @@ export function ResultReport({ result }: ResultReportProps) {
           className="bg-card border border-destructive/20 rounded-lg px-4 py-3.5 flex flex-col gap-2.5"
         >
           <h3 className="text-xs uppercase tracking-wider text-destructive/80 font-mono font-semibold">
-            Red Flags
+            Critical Hiring Risks
           </h3>
           {redFlags.length === 0 ? (
             <p

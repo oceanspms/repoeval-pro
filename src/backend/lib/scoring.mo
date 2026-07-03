@@ -20,6 +20,108 @@ module {
     paths.any(func(p) { lower(p).contains(#text needle) });
   };
 
+  public func displayRequirement(item : Text) : Text {
+    if (item.startsWith(#text "[")) {
+      let parts = item.split(#char ']').toArray();
+      if (parts.size() > 1) {
+        parts[1].trim(#char ' ');
+      } else {
+        item;
+      };
+    } else {
+      item;
+    };
+  };
+
+  func categoryOf(item : Text) : Text {
+    let il = lower(item);
+    if (il.startsWith(#text "[") and il.contains(#text ":auth]")) "auth"
+    else if (il.startsWith(#text "[") and il.contains(#text ":api]")) "api"
+    else if (il.startsWith(#text "[") and il.contains(#text ":data]")) "data"
+    else if (il.startsWith(#text "[") and il.contains(#text ":ui]")) "ui"
+    else if (il.startsWith(#text "[") and il.contains(#text ":tests]")) "tests"
+    else if (il.startsWith(#text "[") and il.contains(#text ":docs]")) "docs"
+    else if (il.startsWith(#text "[") and il.contains(#text ":deployment]")) "deployment"
+    else if (il.startsWith(#text "[") and il.contains(#text ":devops]")) "devops"
+    else if (il.startsWith(#text "[") and il.contains(#text ":qa]")) "qa"
+    else if (il.startsWith(#text "[") and il.contains(#text ":ml]")) "ml"
+    else if (
+      il.contains(#text "auth") or il.contains(#text "login") or il.contains(#text "jwt") or
+      il.contains(#text "otp") or il.contains(#text "rbac") or il.contains(#text "permission") or
+      il.contains(#text "ownership")
+    ) "auth"
+    else if (
+      il.contains(#text "api") or il.contains(#text "endpoint") or il.contains(#text "route") or
+      il.contains(#text "crud") or il.contains(#text "request") or il.contains(#text "response")
+    ) "api"
+    else if (
+      il.contains(#text "database") or il.contains(#text "postgres") or il.contains(#text "mongodb") or
+      il.contains(#text "schema") or il.contains(#text "model") or il.contains(#text "migration") or
+      il.contains(#text "field") or il.contains(#text "constraint") or il.contains(#text "index")
+    ) "data"
+    else if (
+      il.contains(#text "frontend") or il.contains(#text "ui") or il.contains(#text "react") or
+      il.contains(#text "component") or il.contains(#text "responsive") or il.contains(#text "screen")
+    ) "ui"
+    else if (il.contains(#text "test") or il.contains(#text "spec") or il.contains(#text "coverage")) "tests"
+    else if (il.contains(#text "readme") or il.contains(#text "documentation") or il.contains(#text "docs") or il.contains(#text "setup")) "docs"
+    else if (il.contains(#text "deploy") or il.contains(#text "demo") or il.contains(#text "public base url") or il.contains(#text "live url")) "deployment"
+    else if (il.contains(#text "docker") or il.contains(#text "ci") or il.contains(#text "pipeline") or il.contains(#text "terraform") or il.contains(#text "kubernetes")) "devops"
+    else if (il.contains(#text "qa") or il.contains(#text "e2e") or il.contains(#text "acceptance")) "qa"
+    else if (il.contains(#text "machine learning") or il.contains(#text "model training") or il.contains(#text "dataset") or il.contains(#text "inference")) "ml"
+    else "general";
+  };
+
+  func hasModelOrMigrationEvidence(signals : Types.RepoSignals) : Bool {
+    signals.has_db_config or pathsContain(signals.file_tree, "models.") or
+    pathsContain(signals.file_tree, "model.") or pathsContain(signals.file_tree, "migrations/") or
+    pathsContain(signals.file_tree, "schema.") or pathsContain(signals.file_tree, "prisma");
+  };
+
+  func hasApiEvidence(signals : Types.RepoSignals) : Bool {
+    signals.has_api_routes or pathsContain(signals.file_tree, "views.") or
+    pathsContain(signals.file_tree, "viewsets") or pathsContain(signals.file_tree, "urls.") or
+    pathsContain(signals.file_tree, "controllers/") or pathsContain(signals.file_tree, "routes/") or
+    pathsContain(signals.file_tree, "serializers.") or pathsContain(signals.file_tree, "openapi") or
+    pathsContain(signals.file_tree, "swagger");
+  };
+
+  func hasAuthEvidence(signals : Types.RepoSignals) : Bool {
+    signals.has_auth or pathsContain(signals.file_tree, "permissions.") or
+    pathsContain(signals.file_tree, "middleware") or pathsContain(signals.file_tree, "users/") or
+    pathsContain(signals.file_tree, "accounts/");
+  };
+
+  func categoryMatched(category : Text, reqLabel : Text, signals : Types.RepoSignals) : Bool {
+    let l = lower(reqLabel);
+    switch category {
+      case "auth" hasAuthEvidence(signals);
+      case "api" hasApiEvidence(signals);
+      case "data" hasModelOrMigrationEvidence(signals);
+      case "ui" signals.has_frontend or pathsContain(signals.file_tree, "components/") or pathsContain(signals.file_tree, "pages/");
+      case "tests" signals.test_count > 0 or pathsContain(signals.file_tree, "test") or pathsContain(signals.file_tree, "spec");
+      case "docs" (
+        signals.readme_word_count > 100 or pathsContain(signals.file_tree, "docs/") or
+        pathsContain(signals.file_tree, "postman") or pathsContain(signals.file_tree, "openapi")
+      );
+      case "deployment" (
+        signals.has_working_demo_link or signals.has_dockerfile or signals.has_compose or
+        signals.has_scripts or signals.has_setup_script
+      );
+      case "devops" (
+        ((l.contains(#text "docker") or l.contains(#text "container")) and (signals.has_dockerfile or signals.has_compose)) or
+        ((l.contains(#text "ci") or l.contains(#text "pipeline") or l.contains(#text "workflow")) and signals.has_ci) or
+        ((l.contains(#text "terraform") or l.contains(#text "infra") or l.contains(#text "iac")) and signals.has_terraform) or
+        (signals.has_dockerfile or signals.has_compose or signals.has_ci or signals.has_terraform)
+      );
+      case "qa" signals.test_count > 0 or pathsContain(signals.file_tree, "test") or pathsContain(signals.file_tree, "e2e");
+      case "ml" pathsContain(signals.file_tree, "model") or pathsContain(signals.file_tree, "notebook") or pathsContain(signals.file_tree, "dataset");
+      case _ (
+        containsAny(signals.readme_text, [l]) or pathsContain(signals.file_tree, l)
+      );
+    };
+  };
+
   // ── Requirement matching ─────────────────────────────────────────────────
 
   /// Match parsed required_items against repo signals.
@@ -30,8 +132,11 @@ module {
   ) : (Nat, [Text]) {
     var matched : Nat = 0;
     let missing = parsed.required_items.filterMap(func(item) {
-      let itl = lower(item);
+      let reqLabel = displayRequirement(item);
+      let itl = lower(reqLabel);
+      let category = categoryOf(item);
       let found = (
+        categoryMatched(category, reqLabel, signals) or
         // Docker / containerisation
         (itl.contains(#text "docker") and (signals.has_dockerfile or signals.has_compose)) or
         (itl.contains(#text "compose") and signals.has_compose) or
@@ -85,17 +190,69 @@ module {
         (itl.contains(#text "setup") and (signals.readme_word_count > 100 or signals.has_setup_script)) or
         (itl.contains(#text "instruction") and signals.readme_word_count > 100) or
         // Generic: look for keyword in file tree or readme
-        containsAny(signals.readme_text, [itl]) or
+        (category == "docs" and containsAny(signals.readme_text, [itl])) or
         pathsContain(signals.file_tree, itl)
       );
       if (found) {
         matched += 1;
         null;
       } else {
-        ?item;
+        ?reqLabel;
       };
     });
     (matched, missing);
+  };
+
+  public func coreMissingCount(parsed : Types.ParsedAssignment, missingItems : [Text]) : Nat {
+    missingItems.filter(func(item) {
+      parsed.core_items.any(func(ci) { displayRequirement(ci) == item or ci == item })
+    }).size();
+  };
+
+  public func coreRequirementGroupsMissing(parsed : Types.ParsedAssignment, missingItems : [Text]) : Nat {
+    var groups : [Text] = [];
+    for (missing in missingItems.values()) {
+      switch (parsed.core_items.find(func(ci) { displayRequirement(ci) == missing or ci == missing })) {
+        case null {};
+        case (?coreItem) {
+          let group = categoryOf(coreItem);
+          if (not groups.any(func(g) { g == group })) {
+            groups := groups.concat([group]);
+          };
+        };
+      };
+    };
+    groups.size();
+  };
+
+  public func roleDefiningEvidenceMissing(parsed : Types.ParsedAssignment, signals : Types.RepoSignals) : Bool {
+    let role = lower(parsed.role);
+    if (role.contains(#text "backend")) {
+      not signals.has_backend or not hasApiEvidence(signals)
+    } else if (role.contains(#text "fullstack") or role.contains(#text "full-stack") or role.contains(#text "full stack")) {
+      not signals.has_backend or not signals.has_frontend or not hasApiEvidence(signals)
+    } else if (role.contains(#text "frontend") or role.contains(#text "front-end") or role.contains(#text "front end")) {
+      not signals.has_frontend
+    } else if (role.contains(#text "devops")) {
+      not (signals.has_ci or signals.has_dockerfile or signals.has_compose or signals.has_terraform)
+    } else if (role.contains(#text "qa")) {
+      signals.test_count == 0 and not pathsContain(signals.file_tree, "test")
+    } else {
+      false;
+    };
+  };
+
+  public func capFinalScore(
+    rawScore : Nat,
+    coreMissing : Nat,
+    coreGroupsMissing : Nat,
+    roleEvidenceMissing : Bool,
+  ) : Nat {
+    var capped = rawScore;
+    if (coreMissing > 0) capped := Nat.min(capped, 79);
+    if (coreGroupsMissing >= 2) capped := Nat.min(capped, 59);
+    if (roleEvidenceMissing) capped := Nat.min(capped, 79);
+    capped;
   };
 
   /// Compute coverage score (0-100) from matched vs total required items.
@@ -548,9 +705,9 @@ module {
     var gapPoints : [Text] = [];
     if (total == 0) {
       gapPoints := gapPoints.concat(["No assignment requirements could be extracted, so the rubric must be reviewed before making a hiring decision"]);
-    } else if (scores.coverage < 70) {
+    } else if (missing_items.size() > 0) {
       let missSlice = missing_items.sliceToArray(0, Nat.min(3, missing_items.size()));
-      let missNote = if (missSlice.size() > 0) " Missing: " # missSlice.values().join(", ") else "";
+      let missNote = if (missSlice.size() > 0) " Missing or weakly evidenced: " # missSlice.values().join("; ") else "";
       gapPoints := gapPoints.concat(["Coverage at " # scores.coverage.toText() # "/100 — key requirements are absent." # missNote]);
     };
     if (scores.stackMatch < 60) {
@@ -679,7 +836,7 @@ module {
     let depthWeight = 0.175 * Float.max(0.0, depthMult);
     let demoWeight = 0.10 * Float.max(0.0, demoReadinessMult);
     let docsWeight = 0.10 * Float.max(0.0, docsMult);
-    let aiWeight = 0.10 * Float.max(0.0, aiMult);
+    let aiWeight = 0.03 * Float.max(0.0, aiMult);
     let totalWeight = coverageWeight + stackWeight + completenessWeight + depthWeight + demoWeight + docsWeight + aiWeight;
     if (totalWeight <= 0.0) return 0;
     let weighted = (

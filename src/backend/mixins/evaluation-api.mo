@@ -390,17 +390,9 @@ mixin (
     // Classify heuristic items as core or secondary by simple heuristics:
     // Items with strong imperative verbs or "must" / "required" → core
     // Items with "optional", "bonus", "nice to have" → secondary
-    let coreH = heuristicItems.filter(func(item) {
-      let il = item.toLower();
-      not (il.contains(#text "optional") or il.contains(#text "bonus") or
-           il.contains(#text "nice to have") or il.contains(#text "if time") or
-           il.contains(#text "extra"))
-    });
+    let coreH = heuristicItems.filter(func(item) { item.startsWith(#text "[core:") });
     let secH = heuristicItems.filter(func(item) {
-      let il = item.toLower();
-      il.contains(#text "optional") or il.contains(#text "bonus") or
-      il.contains(#text "nice to have") or il.contains(#text "if time") or
-      il.contains(#text "extra")
+      item.startsWith(#text "[required:") or item.startsWith(#text "[optional:")
     });
 
     { role; required_items = heuristicItems; core_items = coreH; secondary_items = secH };
@@ -411,7 +403,19 @@ mixin (
   /// to produce a list of non-empty requirement phrases.
   func extractRequirementsHeuristic(text : Text) : [Text] {
     // Normalise line endings
-    let normalized = text.replace(#char '\r', "");
+    let normalized = text
+      .replace(#char '\r', "")
+      .replace(#text " 1) ", "\n1) ")
+      .replace(#text " 2) ", "\n2) ")
+      .replace(#text " 3) ", "\n3) ")
+      .replace(#text " 4) ", "\n4) ")
+      .replace(#text " 5) ", "\n5) ")
+      .replace(#text " 6) ", "\n6) ")
+      .replace(#text " 7) ", "\n7) ")
+      .replace(#text " 8) ", "\n8) ")
+      .replace(#text " 9) ", "\n9) ")
+      .replace(#text " • ", "\n• ")
+      .replace(#text " - ", "\n- ");
     let lines = normalized.split(#char '\n').toArray();
     let items = lines.filterMap(func(line) : ?Text {
       // Strip leading whitespace
@@ -430,12 +434,20 @@ mixin (
     });
     // Deduplicate while preserving order
     var seen : [Text] = [];
-    let deduped = items.filter(func(item) {
+    let rawDeduped = items.filter(func(item) {
       if (seen.any(func(s) { s == item })) false
       else { seen := seen.concat([item]); true }
     });
-    let enriched = if (deduped.size() < 2) {
-      var merged = deduped;
+    var expanded : [Text] = [];
+    for (item in rawDeduped.values()) {
+      for (req in requirementsFromLine(item).values()) {
+        if (not expanded.any(func(existing) { existing == req })) {
+          expanded := expanded.concat([req]);
+        };
+      };
+    };
+    let enriched = if (expanded.size() < 4) {
+      var merged = expanded;
       for (item in inferRequirementsFromKeywords(text).values()) {
         if (not merged.any(func(existing) { existing == item })) {
           merged := merged.concat([item]);
@@ -443,10 +455,75 @@ mixin (
       };
       merged;
     } else {
-      deduped;
+      expanded;
     };
     // Cap at 30 items to prevent runaway lists
     enriched.sliceToArray(0, Nat.min(30, enriched.size()));
+  };
+
+  func requirementPrefix(category : Text, raw : Text) : Text {
+    let lower = raw.toLower();
+    let severity =
+      if (lower.contains(#text "bonus") or lower.contains(#text "nice to have") or lower.contains(#text "if time") or lower.contains(#text "extra")) "optional"
+      else if (category == "docs" or category == "deployment" or category == "tests") "required"
+      else "core";
+    "[" # severity # ":" # category # "] " # raw.trim(#char ' ');
+  };
+
+  func categoryForRequirement(raw : Text) : Text {
+    let lower = raw.toLower();
+    if (lower.contains(#text "auth") or lower.contains(#text "login") or lower.contains(#text "jwt") or lower.contains(#text "otp") or lower.contains(#text "rbac") or lower.contains(#text "permission") or lower.contains(#text "ownership")) "auth"
+    else if (lower.contains(#text "api") or lower.contains(#text "endpoint") or lower.contains(#text "crud") or lower.contains(#text "request") or lower.contains(#text "response") or lower.contains(#text "pagination") or lower.contains(#text "filter")) "api"
+    else if (lower.contains(#text "database") or lower.contains(#text "postgres") or lower.contains(#text "model") or lower.contains(#text "field") or lower.contains(#text "migration") or lower.contains(#text "constraint") or lower.contains(#text "index")) "data"
+    else if (lower.contains(#text "frontend") or lower.contains(#text "ui") or lower.contains(#text "react") or lower.contains(#text "component") or lower.contains(#text "responsive")) "ui"
+    else if (lower.contains(#text "test") or lower.contains(#text "spec")) "tests"
+    else if (lower.contains(#text "readme") or lower.contains(#text "documentation") or lower.contains(#text "docs") or lower.contains(#text "setup") or lower.contains(#text "design decision") or lower.contains(#text "tradeoff")) "docs"
+    else if (lower.contains(#text "deploy") or lower.contains(#text "demo") or lower.contains(#text "public base url") or lower.contains(#text "live url")) "deployment"
+    else if (lower.contains(#text "docker") or lower.contains(#text "ci") or lower.contains(#text "pipeline") or lower.contains(#text "terraform") or lower.contains(#text "kubernetes")) "devops"
+    else if (lower.contains(#text "qa") or lower.contains(#text "e2e") or lower.contains(#text "acceptance")) "qa"
+    else if (lower.contains(#text "machine learning") or lower.contains(#text "dataset") or lower.contains(#text "inference")) "ml"
+    else "general";
+  };
+
+  func addRequirement(out : [Text], category : Text, reqLabel : Text) : [Text] {
+    let item = requirementPrefix(category, reqLabel);
+    if (out.any(func(existing) { existing == item })) out else out.concat([item]);
+  };
+
+  func requirementsFromLine(line : Text) : [Text] {
+    let lower = line.toLower();
+    var out : [Text] = [];
+    if (lower.contains(#text "signup") or lower.contains(#text "verify-email") or lower.contains(#text "otp") or lower.contains(#text "jwt") or lower.contains(#text "login")) {
+      out := addRequirement(out, "auth", line);
+    };
+    if (lower.contains(#text "rbac") or lower.contains(#text "role") or lower.contains(#text "permission") or lower.contains(#text "ownership")) {
+      out := addRequirement(out, "auth", line);
+    };
+    if (lower.contains(#text "field") or lower.contains(#text "model") or lower.contains(#text "constraint") or lower.contains(#text "migration") or lower.contains(#text "index")) {
+      out := addRequirement(out, "data", line);
+    };
+    if (lower.contains(#text "endpoint") or lower.contains(#text "post /") or lower.contains(#text "get /") or lower.contains(#text "crud") or lower.contains(#text "search") or lower.contains(#text "pagination") or lower.contains(#text "response format")) {
+      out := addRequirement(out, "api", line);
+    };
+    if (lower.contains(#text "frontend") or lower.contains(#text "ui") or lower.contains(#text "react") or lower.contains(#text "responsive") or lower.contains(#text "component")) {
+      out := addRequirement(out, "ui", line);
+    };
+    if (lower.contains(#text "test")) {
+      out := addRequirement(out, "tests", line);
+    };
+    if (lower.contains(#text "readme") or lower.contains(#text "documentation") or lower.contains(#text "api docs") or lower.contains(#text "postman") or lower.contains(#text "setup") or lower.contains(#text "design decision") or lower.contains(#text "tradeoff")) {
+      out := addRequirement(out, "docs", line);
+    };
+    if (lower.contains(#text "deploy") or lower.contains(#text "public base url") or lower.contains(#text "demo")) {
+      out := addRequirement(out, "deployment", line);
+    };
+    if (lower.contains(#text "docker") or lower.contains(#text "ci/cd") or lower.contains(#text "pipeline") or lower.contains(#text "terraform") or lower.contains(#text "kubernetes")) {
+      out := addRequirement(out, "devops", line);
+    };
+    if (out.size() == 0) {
+      out := addRequirement(out, categoryForRequirement(line), line);
+    };
+    out;
   };
 
   func inferRequirementsFromKeywords(text : Text) : [Text] {
@@ -459,22 +536,22 @@ mixin (
     };
     if (al.contains(#text "react") or al.contains(#text "vue") or al.contains(#text "angular") or
         al.contains(#text "frontend") or al.contains(#text "front-end") or al.contains(#text "ui") or
-        al.contains(#text "component")) add("Build the required frontend user interface");
-    if (al.contains(#text "responsive") or al.contains(#text "mobile friendly") or al.contains(#text "mobile-first")) add("Implement responsive layout and mobile-friendly UI");
+        al.contains(#text "component")) add("[core:ui] Build the required frontend user interface");
+    if (al.contains(#text "responsive") or al.contains(#text "mobile friendly") or al.contains(#text "mobile-first")) add("[core:ui] Implement responsive layout and mobile-friendly UI");
     if (al.contains(#text "api") or al.contains(#text "backend") or al.contains(#text "server") or
-        al.contains(#text "endpoint")) add("Implement required backend or API functionality");
+        al.contains(#text "endpoint")) add("[core:api] Implement required backend or API functionality");
     if (al.contains(#text "auth") or al.contains(#text "login") or al.contains(#text "jwt") or
-        al.contains(#text "oauth")) add("Implement authentication flow");
+        al.contains(#text "oauth")) add("[core:auth] Implement authentication flow");
     if (al.contains(#text "database") or al.contains(#text "postgres") or al.contains(#text "mongodb") or
-        al.contains(#text "mysql") or al.contains(#text "redis")) add("Implement required data persistence layer");
-    if (al.contains(#text "test") or al.contains(#text "testing") or al.contains(#text "unit test")) add("Include tests for important flows");
-    if (al.contains(#text "docker") or al.contains(#text "container")) add("Provide Docker or container setup");
-    if (al.contains(#text "ci") or al.contains(#text "pipeline") or al.contains(#text "github action")) add("Provide CI pipeline configuration");
-    if (al.contains(#text "readme") or al.contains(#text "documentation") or al.contains(#text "setup")) add("Document setup and usage instructions");
+        al.contains(#text "mysql") or al.contains(#text "redis")) add("[core:data] Implement required data persistence layer");
+    if (al.contains(#text "test") or al.contains(#text "testing") or al.contains(#text "unit test")) add("[required:tests] Include tests for important flows");
+    if (al.contains(#text "docker") or al.contains(#text "container")) add("[optional:devops] Provide Docker or container setup");
+    if (al.contains(#text "ci") or al.contains(#text "pipeline") or al.contains(#text "github action")) add("[required:devops] Provide CI pipeline configuration");
+    if (al.contains(#text "readme") or al.contains(#text "documentation") or al.contains(#text "setup")) add("[required:docs] Document setup and usage instructions");
     if (al.contains(#text "demo") or al.contains(#text "deploy") or al.contains(#text "vercel") or
-        al.contains(#text "netlify") or al.contains(#text "hosted")) add("Provide a runnable demo or deployment");
+        al.contains(#text "netlify") or al.contains(#text "hosted")) add("[required:deployment] Provide a runnable demo or deployment");
     if (out.size() == 0 and text.trim(#char ' ').size() >= 20) {
-      add(text.trim(#char ' '));
+      add(requirementPrefix("general", text.trim(#char ' ')));
     };
     out;
   };
@@ -802,15 +879,18 @@ mixin (
       {
         readme_text         = verifiedSignals.readme_text;          // keep original readme
         file_tree           = verifiedSignals.file_tree;            // file tree unchanged
-        has_dockerfile      = verifiedSignals.has_dockerfile    or notesSignals.has_dockerfile;
-        has_compose         = verifiedSignals.has_compose       or notesSignals.has_compose;
-        has_ci              = verifiedSignals.has_ci            or notesSignals.has_ci;
-        has_terraform       = verifiedSignals.has_terraform     or notesSignals.has_terraform;
-        has_backend         = verifiedSignals.has_backend       or notesSignals.has_backend;
-        has_frontend        = verifiedSignals.has_frontend      or notesSignals.has_frontend;
-        has_auth            = verifiedSignals.has_auth          or notesSignals.has_auth;
-        has_db_config       = verifiedSignals.has_db_config     or notesSignals.has_db_config;
-        has_api_routes      = verifiedSignals.has_api_routes    or notesSignals.has_api_routes;
+        // Notes are evidence, not implementation. Keep repo-derived code and
+        // infrastructure signals authoritative so pasted notes cannot create
+        // backend/auth/database/API evidence.
+        has_dockerfile      = verifiedSignals.has_dockerfile;
+        has_compose         = verifiedSignals.has_compose;
+        has_ci              = verifiedSignals.has_ci;
+        has_terraform       = verifiedSignals.has_terraform;
+        has_backend         = verifiedSignals.has_backend;
+        has_frontend        = verifiedSignals.has_frontend;
+        has_auth            = verifiedSignals.has_auth;
+        has_db_config       = verifiedSignals.has_db_config;
+        has_api_routes      = verifiedSignals.has_api_routes;
         has_demo_link           = verifiedSignals.has_demo_link           or notesSignals.has_demo_link;
         has_working_demo_link   = verifiedSignals.has_working_demo_link;
         demo_url                = verifiedSignals.demo_url;
@@ -825,9 +905,9 @@ mixin (
           notesText.toLower().contains(#text "gemini");
         readme_word_count   = verifiedSignals.readme_word_count;    // keep original readme word count
         todo_count          = verifiedSignals.todo_count;           // keep repo value (not from notes)
-        has_env_example     = verifiedSignals.has_env_example   or notesSignals.has_env_example;
-        has_seed_data       = verifiedSignals.has_seed_data     or notesSignals.has_seed_data;
-        has_setup_script    = verifiedSignals.has_setup_script  or notesSignals.has_setup_script;
+        has_env_example     = verifiedSignals.has_env_example;
+        has_seed_data       = verifiedSignals.has_seed_data;
+        has_setup_script    = verifiedSignals.has_setup_script;
         error_handler_count = verifiedSignals.error_handler_count; // keep repo value
         file_count          = verifiedSignals.file_count;           // keep repo file count
         // Deep source-crawl fields — from crawled signals, not notes
@@ -848,11 +928,11 @@ mixin (
     let total = parsed.required_items.size();
 
     // Count missing core and secondary items for severity-based coverage deduction
-    let coreMissing : Nat = missing.filter(func(item) {
-      parsed.core_items.any(func(ci) { ci == item })
-    }).size();
+    let coreMissing : Nat = Scoring.coreMissingCount(parsed, missing);
+    let coreGroupsMissing : Nat = Scoring.coreRequirementGroupsMissing(parsed, missing);
+    let roleEvidenceMissing : Bool = Scoring.roleDefiningEvidenceMissing(parsed, mergedSignals);
     let secondaryMissing : Nat = missing.filter(func(item) {
-      parsed.secondary_items.any(func(si) { si == item })
+      parsed.secondary_items.any(func(si) { Scoring.displayRequirement(si) == item or si == item })
     }).size();
 
     // Determine prompt log presence from notes text and signals
@@ -883,13 +963,15 @@ mixin (
     let scores = rawScores;
 
     let rawFinalScore = Scoring.finalScoreWithOverrides(scores, overrides);
-    let fs = if (coreMissing > 0) {
-      Nat.min(rawFinalScore, 69);
-    } else {
-      rawFinalScore;
-    };
+    let fs = Scoring.capFinalScore(rawFinalScore, coreMissing, coreGroupsMissing, roleEvidenceMissing);
     let alignment = Scoring.alignmentFromScore(fs);
-    let redFlags  = Scoring.buildRedFlags(scores, parsed, mergedSignals);
+    var redFlags  = Scoring.buildRedFlags(scores, parsed, mergedSignals);
+    if (coreMissing > 0) {
+      redFlags := redFlags.concat(["Missing core assignment requirement(s): " # coreMissing.toText()]);
+    };
+    if (roleEvidenceMissing) {
+      redFlags := redFlags.concat(["Missing role-defining implementation evidence"]);
+    };
     let summary   = Scoring.buildSummary(scores, fs, missing, redFlags, parsed, mergedSignals);
     let projType  = Scoring.projectType(parsed, mergedSignals);
     let verdict   = Scoring.buildRecruiterVerdict(scores, fs, missing, parsed, mergedSignals);
@@ -905,6 +987,9 @@ mixin (
     };
     if (coreMissing > 0) {
       evidenceInstructions := evidenceInstructions.concat(["Core requirement missing: final verdict capped below PASS"]);
+    };
+    if (roleEvidenceMissing) {
+      evidenceInstructions := evidenceInstructions.concat(["Role-defining implementation evidence missing: PASS capped"]);
     };
 
     let result : Types.EvaluationResult = {

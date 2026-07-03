@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { HttpAgent } from "@icp-sdk/core/agent";
 import { ExternalBlob, type backendInterface, createActor } from "../backend";
 import { mockBackend } from "../mocks/backend";
 
@@ -46,7 +47,22 @@ function fallbackCanisterId(): string | undefined {
   return usable(env.CANISTER_ID_BACKEND) ?? usable(env.CANISTER_BACKEND);
 }
 
-function buildActor(config: FrontendRuntimeEnv): backendInterface | undefined {
+function isLocalHost(host: string): boolean {
+  try {
+    const url = new URL(host);
+    return (
+      url.hostname === "127.0.0.1" ||
+      url.hostname === "localhost" ||
+      url.hostname.endsWith(".localhost")
+    );
+  } catch {
+    return host.includes("127.0.0.1") || host.includes("localhost");
+  }
+}
+
+async function buildActor(
+  config: FrontendRuntimeEnv,
+): Promise<backendInterface | undefined> {
   const canisterId = usable(config.backend_canister_id) ?? fallbackCanisterId();
   if (!canisterId) return undefined;
 
@@ -54,12 +70,17 @@ function buildActor(config: FrontendRuntimeEnv): backendInterface | undefined {
   const key = `${host}|${canisterId}`;
   if (actorCache?.key === key) return actorCache.actor;
 
+  const agent = HttpAgent.createSync({ host });
+  if (isLocalHost(host)) {
+    await agent.fetchRootKey();
+  }
+
   const actor = createActor(
     canisterId,
     (file) => file.getBytes(),
     async (bytes) => ExternalBlob.fromBytes(new Uint8Array(bytes)),
     {
-      agentOptions: { host },
+      agent,
     },
   );
 
@@ -86,7 +107,11 @@ export function useBackendActor(): ActorState {
     void loadRuntimeEnv()
       .then((config) => {
         if (cancelled) return;
-        setState({ actor: buildActor(config), isFetching: false });
+        return buildActor(config);
+      })
+      .then((actor) => {
+        if (cancelled) return;
+        setState({ actor, isFetching: false });
       })
       .catch(() => {
         if (cancelled) return;

@@ -230,6 +230,87 @@ module {
     failures := failIf(identityWeightedFinal != Scoring.finalScore(weightedScores), "identity final-score overrides must preserve the base composite", failures);
     failures := failIf(coverageWeightedFinal >= identityWeightedFinal, "weighting weak coverage must lower the final score, not inflate coverage", failures);
 
+    let fullstackAssignment : Types.ParsedAssignment = {
+      role = "Fullstack";
+      required_items = [
+        "React frontend UI",
+        "REST API server",
+        "database persistence",
+        "integration between frontend and backend",
+      ];
+      core_items = ["React frontend UI", "REST API server", "database persistence"];
+      secondary_items = ["integration between frontend and backend"];
+    };
+    let fullstackSignals : Types.RepoSignals = {
+      baseSignals() with
+      file_tree = ["src/App.tsx", "server/routes/events.ts", "prisma/schema.prisma", "package.json"];
+      has_frontend = true;
+      has_backend = true;
+      has_api_routes = true;
+      has_db_config = true;
+      file_count = 40;
+      readme_word_count = 220;
+      detected_frameworks = ["React", "Express"];
+      has_scripts = true;
+    };
+    let (fullstackMatched, fullstackMissing) = Scoring.matchRequirements(fullstackAssignment, fullstackSignals);
+    failures := failIf(fullstackMissing.size() != 0, "fullstack fixture should match frontend, backend, API, and database requirements", failures);
+    failures := failIf(
+      Scoring.coverageScore(fullstackMatched, fullstackAssignment.required_items.size(), 0, 0) != 100,
+      "fullstack fixture coverage should be 100",
+      failures,
+    );
+
+    let devopsAssignment : Types.ParsedAssignment = {
+      role = "DevOps";
+      required_items = ["Docker container setup", "CI/CD pipeline", "Terraform infrastructure"];
+      core_items = ["Docker container setup", "CI/CD pipeline", "Terraform infrastructure"];
+      secondary_items = [];
+    };
+    let devopsSignals : Types.RepoSignals = {
+      baseSignals() with
+      file_tree = ["Dockerfile", ".github/workflows/deploy.yml", "infra/main.tf"];
+      has_dockerfile = true;
+      has_ci = true;
+      has_terraform = true;
+      file_count = 12;
+      readme_word_count = 150;
+    };
+    let (devopsMatched, devopsMissing) = Scoring.matchRequirements(devopsAssignment, devopsSignals);
+    failures := failIf(devopsMissing.size() != 0, "devops fixture should match Docker, CI/CD, and IaC requirements", failures);
+    failures := failIf(Scoring.stackMatchScore(devopsSignals, devopsAssignment) != 100, "devops stack match should be 100 with CI, Docker, and Terraform", failures);
+
+    let currentAuditAssignment : Types.ParsedAssignment = {
+      role = "Backend";
+      required_items = [
+        "Authentication with email OTP and JWT",
+        "RBAC permissions and ownership",
+        "Event and enrollment domain models",
+        "Search and enrollment APIs",
+        "README, tests, API docs, deployment evidence",
+      ];
+      core_items = [
+        "Authentication with email OTP and JWT",
+        "RBAC permissions and ownership",
+        "Event and enrollment domain models",
+        "Search and enrollment APIs",
+      ];
+      secondary_items = ["README, tests, API docs, deployment evidence"];
+    };
+    let weakAuditSignals : Types.RepoSignals = {
+      baseSignals() with
+      readme_text = "README with setup and AI prompt log.";
+      file_tree = ["README.md", "Dockerfile", ".env.example"];
+      has_dockerfile = true;
+      has_env_example = true;
+      has_ai_log = true;
+      readme_word_count = 300;
+      file_count = 3;
+    };
+    let (auditMatched, auditMissing) = Scoring.matchRequirements(currentAuditAssignment, weakAuditSignals);
+    failures := failIf(auditMatched >= 3, "current audit baseline should not over-credit docs/deploy evidence as core implementation", failures);
+    failures := failIf(auditMissing.size() < 3, "current audit baseline should expose missing core auth/RBAC/domain/API groups", failures);
+
     failures;
   };
 };

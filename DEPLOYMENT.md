@@ -117,11 +117,11 @@ corepack pnpm dev
 
 Mock mode bypasses live actor calls and uses in-memory evaluation/history data. Do not enable it for production builds.
 
-## Free Vercel or Netlify Frontend Hosting
+## Free Vercel Frontend Hosting
 
-Vercel and Netlify can host the React frontend for free-tier web access. They do
-not deploy the Motoko backend canister. Deploy the backend to IC first, then
-point the hosted frontend at that backend canister.
+Vercel can host the React frontend for free-tier web access. It does not deploy
+the Motoko backend canister. Deploy the backend to IC first, then point the
+hosted frontend at that backend canister.
 
 Recommended order:
 
@@ -150,8 +150,9 @@ The checked-in provider configs are:
   - output directory: `src/frontend/dist`
   - SPA rewrite: all routes serve `/index.html`
 - `netlify.toml`
-  - build command: `node scripts/write-frontend-env.mjs && corepack pnpm --dir src/frontend build`
+  - build command: `VITE_BACKEND_MODE=rest VITE_BACKEND_API_BASE=/api node scripts/write-frontend-env.mjs && corepack pnpm --dir src/frontend build`
   - publish directory: `src/frontend/dist`
+  - API rewrite: `/api/*` to the Netlify Function backend
   - SPA redirect: `/*` to `/index.html` with status `200`
 
 Local hosted-frontend build simulation:
@@ -167,6 +168,38 @@ After this simulation, restore the committed placeholder env if needed:
 
 ```powershell
 git checkout -- src/frontend/env.json
+```
+
+## Permanent Netlify Full-System Hosting
+
+When ICP cycles are unavailable, Netlify is the simplest permanent web-hosted
+stack for this repo:
+
+- React frontend runs from `src/frontend/dist`.
+- API runs from `netlify/functions/api.mjs`.
+- Shared evaluation history is stored in Netlify Blobs under the
+  `repoeval-history` store.
+- The existing ICP/Motoko backend remains in the repo and is not removed.
+
+Netlify build settings are already checked in through `netlify.toml`.
+
+Connect the GitHub repo to Netlify and deploy from `main`. No backend canister
+environment variables are required for the Netlify REST mode. The build command
+sets:
+
+```text
+VITE_BACKEND_MODE=rest
+VITE_BACKEND_API_BASE=/api
+```
+
+Local simulation for the Netlify frontend build:
+
+```powershell
+$env:VITE_BACKEND_MODE="rest"
+$env:VITE_BACKEND_API_BASE="/api"
+corepack pnpm frontend:env
+corepack pnpm --dir src/frontend env:check
+corepack pnpm --dir src/frontend build
 ```
 
 After the frontend and backend build artifacts exist, run this root-level check

@@ -1,6 +1,11 @@
 [build]
-  command = "node scripts/write-frontend-env.mjs && corepack pnpm --dir src/frontend build"
+  command = "VITE_BACKEND_MODE=rest VITE_BACKEND_API_BASE=/api node scripts/write-frontend-env.mjs && corepack pnpm --dir src/frontend build"
   publish = "src/frontend/dist"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
 
 [[redirects]]
   from = "/*"

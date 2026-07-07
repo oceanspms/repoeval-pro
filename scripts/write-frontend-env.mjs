@@ -32,6 +32,8 @@ function usable(value) {
 }
 
 const backendHost = readEnv("VITE_BACKEND_HOST") || "https://icp-api.io";
+const backendMode = readEnv("VITE_BACKEND_MODE") || "icp";
+const backendApiBase = readEnv("VITE_BACKEND_API_BASE") || "/api";
 const backendCanisterId = firstUsable([
   "VITE_BACKEND_CANISTER_ID",
   "CANISTER_ID_BACKEND",
@@ -45,7 +47,7 @@ if (!usable(backendHost)) {
   process.exit(1);
 }
 
-if (!usable(backendCanisterId)) {
+if (backendMode !== "rest" && !usable(backendCanisterId)) {
   console.error(
     "[env] Set VITE_BACKEND_CANISTER_ID to the deployed backend canister ID before building the hosted frontend.",
   );
@@ -53,13 +55,15 @@ if (!usable(backendCanisterId)) {
 }
 
 const config = {
+  backend_mode: backendMode,
   backend_host: backendHost,
   backend_canister_id: backendCanisterId,
+  backend_api_base: backendApiBase,
   project_id: projectId,
   ii_derivation_origin: iiDerivationOrigin,
 };
 
 fs.writeFileSync(envPath, `${JSON.stringify(config, null, 2)}\n`);
 console.log(
-  `[env] wrote ${path.relative(root, envPath)} for backend ${backendCanisterId} at ${backendHost}`,
+  `[env] wrote ${path.relative(root, envPath)} for ${backendMode} backend`,
 );

@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { HttpAgent } from "@icp-sdk/core/agent";
 import { ExternalBlob, type backendInterface, createActor } from "../backend";
+import { createRestBackend } from "../lib/restBackend";
 import { mockBackend } from "../mocks/backend";
 
 interface FrontendRuntimeEnv {
+  backend_mode?: string;
+  backend_api_base?: string;
   backend_host?: string;
   backend_canister_id?: string;
 }
@@ -63,6 +66,10 @@ function isLocalHost(host: string): boolean {
 async function buildActor(
   config: FrontendRuntimeEnv,
 ): Promise<backendInterface | undefined> {
+  if (usable(config.backend_mode)?.toLowerCase() === "rest") {
+    return createRestBackend(usable(config.backend_api_base) ?? "/api");
+  }
+
   const canisterId = usable(config.backend_canister_id) ?? fallbackCanisterId();
   if (!canisterId) return undefined;
 

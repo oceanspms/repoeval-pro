@@ -24,6 +24,7 @@
     "sharp": "^0.34.4"
   },
   "dependencies": {
-    "@caffeineai/core-infrastructure": "^0.3.0"
+    "@caffeineai/core-infrastructure": "^0.3.0",
+    "@netlify/blobs": "^10.7.9"
   }
 }

@@ -86,13 +86,28 @@ requireFile(path.join(root, "src/frontend/dist/env.json"));
 const envPath = path.join(root, "src/frontend/env.json");
 const env = readJson(envPath);
 if (env) {
-  const hasRuntimeConfig = usable(env.backend_host) && usable(env.backend_canister_id);
-  if (hasRuntimeConfig) {
-    pass("frontend env has backend host and canister id");
+  if (env.backend_mode === "rest") {
+    if (usable(env.backend_api_base)) {
+      pass("frontend env uses REST backend mode");
+    } else if (strictEnv) {
+      fail("frontend REST mode requires backend_api_base");
+    } else {
+      warn("frontend REST mode is missing backend_api_base");
+    }
   } else if (strictEnv) {
-    fail("frontend env still has placeholder backend_host/backend_canister_id");
+    const hasRuntimeConfig = usable(env.backend_host) && usable(env.backend_canister_id);
+    if (hasRuntimeConfig) {
+      pass("frontend env has backend host and canister id");
+    } else {
+      fail("frontend env still has placeholder backend_host/backend_canister_id");
+    }
   } else {
-    warn("frontend env still has placeholder backend_host/backend_canister_id");
+    const hasRuntimeConfig = usable(env.backend_host) && usable(env.backend_canister_id);
+    if (hasRuntimeConfig) {
+      pass("frontend env has backend host and canister id");
+    } else {
+      warn("frontend env still has placeholder backend_host/backend_canister_id");
+    }
   }
 }
 

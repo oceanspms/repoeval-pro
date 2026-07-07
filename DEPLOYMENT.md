@@ -36,6 +36,17 @@ Before a production build, replace the placeholder values in `src/frontend/env.j
 
 Do not commit environment values that should remain private.
 
+For Vercel or Netlify, do not edit `src/frontend/env.json` manually. Set these
+provider environment variables instead:
+
+- `VITE_BACKEND_CANISTER_ID`: required, the deployed backend canister ID.
+- `VITE_BACKEND_HOST`: optional, defaults to `https://icp-api.io`.
+- `VITE_PROJECT_ID`: optional, defaults to `repoeval-pro`.
+- `VITE_II_DERIVATION_ORIGIN`: optional.
+
+Hosted builds run `scripts/write-frontend-env.mjs`, which writes the runtime
+`env.json` before the frontend build.
+
 ## Build Checklist
 
 From the repository root:
@@ -105,6 +116,58 @@ corepack pnpm dev
 ```
 
 Mock mode bypasses live actor calls and uses in-memory evaluation/history data. Do not enable it for production builds.
+
+## Free Vercel or Netlify Frontend Hosting
+
+Vercel and Netlify can host the React frontend for free-tier web access. They do
+not deploy the Motoko backend canister. Deploy the backend to IC first, then
+point the hosted frontend at that backend canister.
+
+Recommended order:
+
+1. Deploy the backend canister:
+
+```powershell
+corepack pnpm deploy:ic
+```
+
+2. Copy the backend canister ID printed by the deploy script.
+
+3. In Vercel or Netlify project settings, add:
+
+```text
+VITE_BACKEND_CANISTER_ID=<backend-canister-id>
+VITE_BACKEND_HOST=https://icp-api.io
+```
+
+4. Connect the GitHub repository and deploy from `main`.
+
+The checked-in provider configs are:
+
+- `vercel.json`
+  - install command: `corepack pnpm install --prefer-offline`
+  - build command: `node scripts/write-frontend-env.mjs && corepack pnpm --dir src/frontend build`
+  - output directory: `src/frontend/dist`
+  - SPA rewrite: all routes serve `/index.html`
+- `netlify.toml`
+  - build command: `node scripts/write-frontend-env.mjs && corepack pnpm --dir src/frontend build`
+  - publish directory: `src/frontend/dist`
+  - SPA redirect: `/*` to `/index.html` with status `200`
+
+Local hosted-frontend build simulation:
+
+```powershell
+$env:VITE_BACKEND_CANISTER_ID="<backend-canister-id>"
+$env:VITE_BACKEND_HOST="https://icp-api.io"
+corepack pnpm frontend:build:hosted
+corepack pnpm qa:deployment:strict
+```
+
+After this simulation, restore the committed placeholder env if needed:
+
+```powershell
+git checkout -- src/frontend/env.json
+```
 
 After the frontend and backend build artifacts exist, run this root-level check
 to verify the deployment package shape:

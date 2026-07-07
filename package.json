@@ -13,6 +13,8 @@
     "fix": "pnpm -r --if-present run fix",
     "deploy:ic": "node scripts/deploy-ic.mjs",
     "deploy:local": "node scripts/deploy-ic.mjs --local",
+    "frontend:env": "node scripts/write-frontend-env.mjs",
+    "frontend:build:hosted": "node scripts/write-frontend-env.mjs && corepack pnpm --dir src/frontend build",
     "qa:toolchain": "node scripts/check-toolchain.mjs",
     "qa:deployment": "node scripts/verify-deployment.mjs",
     "qa:deployment:strict": "node scripts/verify-deployment.mjs --strict-env",

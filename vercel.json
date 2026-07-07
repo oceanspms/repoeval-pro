@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "corepack pnpm install --prefer-offline",
+  "buildCommand": "node scripts/write-frontend-env.mjs && corepack pnpm --dir src/frontend build",
+  "outputDirectory": "src/frontend/dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
